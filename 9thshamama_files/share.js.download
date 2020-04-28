@@ -1,0 +1,477 @@
+var Share = {};
+
+Share.activated = false;
+Share.emailAddress = '';
+Share.accessLevel = null;
+Share.message = '';
+Share.link = null;
+Share.timeOutId = null;
+Share.senderMode = 'sender-never';
+
+Share.sendData = null;
+
+
+Share.validateEmail = function(field) {
+  var sameEmailAlert = document.querySelector('.alert.same-email-alert');
+  if (sameEmailAlert) {
+    if (field === window.currentUserEmail && !window.User.isPaid) {
+      sameEmailAlert.style.display = 'block';
+      return false;
+    }
+    sameEmailAlert.style.display = 'none';
+  }
+  const regex = /^([\w-\+\.]+(?:\.[\w-]+)*)@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$/i;
+  return (regex.test(field)) ? true : false;
+};
+
+Share.validateMultipleEmailsCommaSeparated = function(value) {
+  var result = value.split(',');
+
+  for (var i = 0; i < result.length; i++) {
+    var currEmail = $.trim(result[i]);
+
+    if (!currEmail && i > 0) {
+      return true;
+    }
+
+    if (!Share.validateEmail(currEmail)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+Share.verifySignatureRequest = function() {
+    if ($('.share_popup').length || $('.request-signature').length) {
+        Share.sendInviteMessage();
+        return;
+    }
+    window.ReactCompatibility.openFreeWriteRequireSignatureModal();
+    return;
+}
+
+Share.setupShareButton = function(buttonText, documentType, memberTracking, shareFuncName, shareTrackParam, closeTrackParam) {
+    var onclickSend = shareFuncName + '();_track("Share | ' + shareTrackParam + '", "' + documentType + ' | FreeWrite-Builder' + memberTracking + '");';
+    document.getElementById("sendButton").setAttribute('onclick', onclickSend);
+    $('#sendButton').text(buttonText);
+    var onclickClose = '$("#share_toolbox").modal("hide");_track("Share | ' + closeTrackParam + '", "' + documentType + ' | FreeWrite-Builder' + memberTracking + '");';
+    document.getElementById("closeShareButton").setAttribute('onclick', onclickClose);
+}
+
+Share.updateShareButtonTracking = function(accessLevel, documentType, memberTracking) {
+    switch(accessLevel) {
+        case 'view':
+            Share.setupShareButton('Send Document', documentType, memberTracking, 'Share.sendInviteMessage', 'Send Document Button', 'Close Button');
+            break;
+        case 'sign':
+            Share.setupShareButton('Send for Signature', documentType, memberTracking, 'Share.sendInviteRequestMessage', 'Send for Signature', 'Close Send for Signature');
+            break;
+        case 'edit':
+        default:
+            return;
+    }
+}
+
+Share.activateSendButtonWhenReady = function()
+{
+  if (this.emailAddress && this.accessLevel && this.message)
+  {
+    $("#sendButton").removeClass("disabled");
+    $("#sendRequestButton").removeClass("disabled");
+  }else{
+    $("#sendButton").addClass("disabled");
+    $("#sendRequestButton").addClass("disabled");
+  }
+}
+
+Share.updateSendButton = function (text) {
+  if (window.ReactCompatibility.getState().EditorStateHandler.useShareRequest) {
+    $('#sendButton').text(text);
+  }
+};
+
+Share.showPopup = function()
+{
+    $("#share_toolbox").modal("show");
+}
+
+Share.activate = function()
+{
+  Share.activateSendButtonWhenReady();
+
+  $('#share-email').on('change keyup', function(event){
+    var email = $('#share-email').val();
+    Share.emailAddress = email;
+    Share.emailValidate(email);
+  });
+
+  $('#share-email').focus(function(event){
+    var email = $('#share-email').val();
+    Share.emailAddress = email;
+    Share.emailValidate(email);
+  });
+
+  $("#share-message").on('change keyup', function(event){
+    var message = $('#share-message').val();
+    Share.message = message;
+    Share.messageValidate(message);
+  });
+};
+
+Share.grantAccess = function(accessLevel, setMessage)
+{
+  var onStep = 0;
+  var availableAccessLevels = ["view", "sign", "edit"];
+
+  if (typeof setMessage === 'undefined') {
+    setMessage = true;
+  }
+
+  if (availableAccessLevels.indexOf(accessLevel) == -1) {
+    alert("No such access level");
+    this.accessLevel = null;
+    return false;
+  };
+
+  this.accessLevel = accessLevel;
+
+  // Remove any selected options
+  $(".access-option").each(function(i, el){
+    $(el).removeClass("option-active");
+  });
+
+  // Highlight the correct option
+  $("#accessLevel-"+accessLevel).addClass("option-active");
+
+
+  setTimeout(function(){
+    // Jump to e-mail field
+    $("#share-email").focus();
+  }, 300);
+
+  var sameEmailAlert = document.querySelector('.alert.same-email-alert span');
+  var emailAddressTitle = document.querySelector('.share-step h1 span');
+  if (accessLevel === 'view') {
+    if (window.LIMIT_ONE_SPLIT_TEST) {
+      emailAddressTitle.innerHTML = 'Invite People';
+    }
+    sameEmailAlert.innerHTML = 'You cannot send a PDF to yourself. You can download your PDF by clicking the green download button on the right.';
+  } else if (accessLevel === 'sign') {
+    if (window.LIMIT_ONE_SPLIT_TEST) {
+      emailAddressTitle.innerHTML = 'Who Needs to Sign?';
+    }
+    sameEmailAlert.innerHTML = 'You cannot request a signature to yourself. You can sign a signature or download your PDF by clicking the green download button on the right.';
+  }
+  if (setMessage) {
+    this.getMessageAndLink();
+  }
+  this.enableNextStep(onStep);
+};
+
+Share.setKey = function(key)
+{
+  this.key = null;
+  if (key) {
+    this.key = key;
+  };
+}
+
+Share.showCreateAccountModal = function (selector) {
+  $(selector).modal('show');
+  $(selector).on('hide.bs.modal', function(e) {
+    // If user closes modal, refresh to display the finished
+    // version of this document
+    window.location.reload();
+  });
+};
+
+
+Share.getMessageAndLink = function(successAction)
+{
+  if (!DocumentSettings.type || !DocumentSettings.ses || !DocumentSettings.key) {
+    alert("Document info improperly set, try refreshing the page");
+    return false;
+  };
+    var message = null;
+    switch(this.accessLevel) {
+        case 'sign':
+            message = 'Hello, please sign this document at your earliest convenience. Thank you.';
+            break;
+        case 'view':
+            message = 'Hi,' +
+            '\n' + 'I\'ve created a document that I would like to share with you. Click above to view and download.' +
+            '\n' + 'Thanks!';
+            break;
+    }
+
+    Share.setMessage(message);
+    Share.activateSendButtonWhenReady();
+
+    if (successAction) {
+        successAction();
+    }
+}
+
+Share.sendInviteMessage = function()
+{
+  if (!$('#share_toolbox').hasClass('in')) {
+      $("#share_toolbox").modal("show");
+  }
+
+  this.updateMessage();
+  $('#sendButton').button('loading');
+  var successAction = function()
+  {
+    $("#messageSentSuccess").removeClass("hidden");
+    $('#sendButton').hide();
+    $('#closeShareButton').hide();
+    $('#sendRequestButton').hide();
+    $('#closeRequestButton').hide();
+
+    setTimeout(function(){
+      $("#share_toolbox").modal("hide");
+      $('#sendButton').show();
+      $('#closeShareButton').show();
+      $('#sendButton').button('reset');
+      $("#messageSentSuccess").addClass("hidden");
+
+      if (Share.accessLevel !== 'view') {
+          Share.showWaitingMode();
+      }
+    }, 2000);
+
+  };
+
+  var errorAction = function()
+  {
+    $('#sendButton').button('reset');
+  };
+
+  Share._sendShareMessage(successAction, errorAction);
+}
+
+Share.sendInviteRequestMessage = function () {
+  if (window.ReactCompatibility.getState().EditorStateHandler.useShareRequest) {
+    $('#share_toolbox').modal('show');
+    Share._sendRequestShareMessage();
+  } else {
+    Share.sendInviteMessage();
+  }
+};
+
+Share._sendDoneMessage = function(buttonSelector)
+{
+  $(buttonSelector).button('loading');
+  var modalSelector = '#createAccountModal';
+
+  window.FormSwiftAPI.finishDocumentShare(DocumentSettings.shareKey, function (responseData) {
+    if (responseData.status === 'error') {
+      alert('An error occured.  Try refreshing your browser and trying again');
+    } else {
+      setTimeout(function() {
+        $(buttonSelector).button('complete');
+        Share.showCreateAccountModal(modalSelector);
+      }, 1500);
+    }
+  });
+}
+
+Share.sendDoneMessage = function()
+{
+  Share._sendDoneMessage('#doneButton');
+}
+
+Share.sendRequestSignatureDoneMessage = function()
+{
+  Share._sendDoneMessage('#requestSignatureDoneButton');
+}
+
+Share.messageAsHTML = function(){
+  return this.message.replace(/\n/g, "<br>");
+}
+
+Share.updateRequestSignatureFields = function()
+{
+    Editor.updateRequestSignatureFields();
+    window.ReactCompatibility.saveFreeWriteContent();
+}
+
+Share.showRequestEditor = function()
+{
+    Editor.enableRequestMode();
+    window.ReactCompatibility.saveFreeWriteContent();
+}
+
+Share.hideRequestEditor = function()
+{
+    Editor.disableRequestMode();
+    window.ReactCompatibility.saveFreeWriteContent();
+}
+
+Share.showWaitingMode = function()
+{
+    Editor.enableWaitingMode();
+    window.ReactCompatibility.saveFreeWriteContent();
+}
+
+Share._sendRequestShareMessage = function()
+{
+
+    if (!this.emailAddress || !this.accessLevel || !this.message || !Share.validateMultipleEmailsCommaSeparated(this.emailAddress)) {
+      alert("Your share message is incomplete.  Please fill in all of the fields correctly");
+      return;
+    }
+
+     var sendData = {"to": this.emailAddress, "message": this.messageAsHTML(), "accessLevel": this.accessLevel, "session": DocumentSettings.ses, "key": DocumentSettings.key, "documentType": DocumentSettings.type, "shareKey": DocumentSettings.shareKey, "printKey": Share.key};
+    this.sendData = sendData;
+    this.showRequestEditor();
+}
+
+Share._sendShareMessage = function (successAction, errorAction)
+{
+  if (!successAction || !errorAction) {
+    alert('This is not a public method');
+  }
+
+  if (!this.emailAddress || !this.accessLevel || !this.message || !Share.validateMultipleEmailsCommaSeparated(this.emailAddress)) {
+    alert('Your share message is incomplete.  Please fill in all of the fields correctly');
+    return;
+  }
+
+  const instructions = this.getInstructions();
+
+  var payload = {
+    'to': this.emailAddress.split(','),
+    'message': this.messageAsHTML() + instructions,
+    'user_id': parseInt(window.COOKIE.get('userid'), 10),
+    'user_token': window.COOKIE.get('userToken'),
+    'document_type': DocumentSettings.type,
+    'session_id': parseInt(DocumentSettings.key, 10),
+    'session_hash': DocumentSettings.ses,
+    'access_level': this.accessLevel,
+    'builder_type': 'freewrite',
+  };
+
+  window.FormSwiftAPI.createDocumentShare(payload, function (responseData) {
+    if (responseData.status === 'error') {
+      errorAction();
+    } else {
+      var shareKeys = [];
+      responseData.data.document_shares.forEach(function (documentShare) {
+        shareKeys.push(documentShare.share_key);
+      });
+      successAction();
+    }
+  });
+}
+
+Share.setMessage = function(message)
+{
+  if (!this.accessLevel) {
+    this.message = null;
+        $("#share-message").val("");
+    return null;
+  }
+
+  this.message = message;
+  $("#share-message").val(this.message);
+}
+
+Share.updateMessage = function()
+{
+  Share.setMessage($("#share-message").val());
+}
+
+Share.emailValidate = function(emailValue)
+{
+  var onStep = 1;
+  // Verify that we have a real e-mail address, or many real e-mail addresses
+  if (Share.validateMultipleEmailsCommaSeparated(emailValue)) {
+    this.emailAddress = emailValue;
+    this.enableNextStep(onStep);
+
+    this.clearTimeOutId();
+  } else {
+    this.clearTimeOutId();
+
+    this.emailAddress = null;
+    this.disableFollowingSteps(onStep);
+  }
+};
+
+Share.clearTimeOutId = function()
+{
+  if(Share.timeOutId)
+  {
+    clearTimeout(Share.timeOutId);
+    Share.timeOutId = null;
+  }
+}
+
+
+Share.messageValidate = function(message)
+{
+  var onStep = 2;
+
+  if (message) {
+    this.message = message;
+    this.enableNextStep(onStep);
+  }else{
+    this.message = null;
+    this.disableFollowingSteps(onStep);
+  }
+};
+
+
+Share.disableFollowingSteps = function(onStep)
+{
+  Share.activateSendButtonWhenReady();
+  // Add the disabled class to ever following step of the current step
+  // If we're on step 1, step 2 & 3 will be disabled
+  $(".share-step").each(function(i, el){
+    if (i > onStep) {
+      $(el).addClass('disabled');
+    }
+  });
+};
+
+Share.enableNextStep = function(onStep)
+{
+  Share.activateSendButtonWhenReady();
+  // Enabled the next step
+  $(".share-step").each(function(i, el){
+    if (i == onStep+1) {
+
+      $(el).removeClass('disabled');
+      return;
+    }
+  });
+};
+
+Share.getInstructions = function()
+{
+  if (this.accessLevel === "sign") {
+    return '<br><br> Once you\'re finished, just hit the green "I\'m Done" button to send a notification that the document has been signed.';
+  }
+  return '';
+}
+
+Share.setSenderMode = function(senderMode)
+{
+  var availableSenderModes = ["sender-never", "sender-first", "sender-last"];
+
+  if (availableSenderModes.indexOf(senderMode) < 0) {
+    alert("No such sender mode");
+    this.senderMode = null;
+    return false;
+  }
+
+  this.senderMode = senderMode;
+
+  return true;
+}
+
+$(function() {
+  Share.activate();
+});

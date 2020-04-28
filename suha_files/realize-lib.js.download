@@ -1,0 +1,2390 @@
+angular
+.module('realize-lib.analytics.google', [])
+.provider(
+	'GoogleAnalytics',
+	function () {
+
+		var _profileId = '',
+			_host = '',
+			_devMode = false,
+			options = {};
+
+		function idIsValid (id) {
+			if (!id) { return false; }
+			return (/^(ua|yt|mo)-\d{4,9}-\d{1,4}$/i).test(id.toString());
+		}
+
+		this.setProfile = function (profile) {
+			if (idIsValid(profile)) {
+				_profileId = profile;
+			}
+		};
+
+		this.setHost = function (host) {
+			_host = host;
+		};
+
+		this.setDevMode = function (mode) {
+			_devMode = mode;
+		};
+
+		this.setOptions = function (obj) {
+			angular.extend(options, obj)
+		};
+
+		this.$get = [
+			'$log',
+			'$location',
+			'$window',
+			'$document',
+			'$timeout',
+			'$rootScope',
+			function ($log, $location, $window, $document, $timeout, $rootScope) {
+				/**
+				Public object to be returned by Angular
+				service factory.
+
+				@property service
+				@type Object
+				**/
+				var service,
+					page = null,
+					trackingLabel = false,
+					loadInterval = 100,
+					ready = false,
+					gaTracker,
+					loadTracker, check, wrap, track;
+
+				loadTracker = function () {
+					var gaHost,
+						s,
+						checker;
+
+					gaHost = ('https' === $location.protocol()) ? 'https://ssl.' : 'http://www.';
+					s = $window.document.createElement('script');
+					s.src = gaHost + 'google-analytics.com/analytics.js';
+					$window.document.getElementsByTagName('head')[0].appendChild(s);
+					checker = wrap(this, checkIfAvailable);
+					$timeout(checker, loadInterval);
+				};
+
+				checkIfAvailable = function () {
+					var checker,
+						_ga;
+
+					if ($window.ga) {
+						gaTracker = $window.ga.create({
+							trackingId: _profileId,
+							cookieDomain: (_devMode) ? 'none' : 'auto'
+						});
+						gaTracker.set(options);
+						ready = true;
+					} else {
+						checker = wrap(this, checkIfAvailable);
+						$timeout(checker, loadInterval);
+					}
+				};
+
+				wrap = function (obj, method) {
+					return function () {
+						return method.apply(obj, arguments);
+					};
+				};
+
+				track = function (options) {
+					if (_profileId) {
+						if (ready) {
+							gaTracker.send(options);
+						} else {
+							tracker = wrap(this, track);
+							$timeout(function () {
+								tracker(options);
+							}, loadInterval);
+						}
+					}
+				};
+
+				this.trackPageview = function (page) {
+					track(
+						{
+							hitType: 'pageview',
+							page: page
+						}
+					);
+				};
+
+				this.trackEvent = function (category, action, label) {
+					track(
+						{
+							hitType: 'event',
+							eventCategory: category,
+							eventAction: action,
+							eventLabel: label
+						}
+					);
+				};
+
+				if (_profileId) {
+					loadTracker();
+				} else {
+					$log.warn('Invalid Google Analytics ID given, please ensure its a valid ID like the following example: UA-XXXXXXX-X');
+				}
+
+				return this;
+			}
+		]
+	}
+);
+angular
+.module('realize-lib.analytics', [])
+.provider(
+    'Analytics',
+    function () {
+
+        var map = {};
+
+        this.addTracker = function(name, caller) {
+            if (angular.isUndefined(map[name])) {
+                map[name] = [];
+            }
+
+            map[name].push(caller);
+        };
+
+        this.$get = [
+            '$log',
+            '$injector',
+            function ($log, $injector) {
+
+                this.track = function (name, obj) {
+                    if (angular.isUndefined(map[name])) {
+                        $log.error('AnalyticsEvent undefined: ' + name, obj);
+                        return;
+                    }
+
+                    angular.forEach(map[name], function (caller) {
+                        $injector.invoke(caller, null, {AnalyticsEvent: obj});
+                    });
+                };
+
+                return this;
+            }
+        ]
+    }
+);
+angular
+.module(
+	'realize-lib.analytics.track-click',
+	[
+		'realize-lib.analytics'
+	]
+)
+.directive(
+	'rlzTrackClick',
+	[
+		'$log',
+		'Analytics',
+		function ($log, Analytics) {
+			return {
+				link: function (scope, element, attributes) {
+					var eventName, eventObject;
+
+					attributes.$observe('rlzTrackClick', function (trackingEvent) {
+						eventName = scope.$eval(trackingEvent) || trackingEvent;
+					});
+
+					attributes.$observe('rlzTrackClickEvent', function (trackingObj) {
+						eventObject = scope.$eval(trackingObj) || trackingObj;
+					});
+
+					element.on('click', function () {
+						Analytics.track(eventName, eventObject);
+					});
+				}
+			}
+		}
+	]
+);
+angular.module('realize-lib.content.content-model', [])
+    .factory('RlzContent', [
+
+        function () {
+            'use strict';
+
+            var RlzContent = function (json) {
+                var self = this;
+
+                angular.copy(json || {}, self);
+            };
+
+            // establish a schema
+            var schema = {
+                id: '',
+                version: 0,
+                title: '',
+                text: '', // description
+                url: '',
+                fileType: '',
+                mediaType: '',
+                viewPermissions: 'Stream/View/Download',
+                attachments: [],
+                contributor: '',
+                contribSource: '',
+                externalSource: '',
+                thumbnailUrl: '',
+                previewUrl: '',
+                previews: []
+            };
+
+            angular.extend(RlzContent.prototype, schema);
+
+            // override these in subclass as needed
+
+            RlzContent.prototype.$isTest = function () {
+                return this.$getMediaType() === 'Test';
+            };
+
+            RlzContent.prototype.$isLesson = function () {
+                return this.$getMediaType() === 'Lesson';
+            };
+
+            RlzContent.prototype.$isSco = function () {
+                return this.$getFileType() === 'SCO';
+            };
+
+            RlzContent.prototype.$isImage = function () {
+                return this.$getMediaType() === 'Image';
+            };
+
+            RlzContent.prototype.$isAudio = function () {
+                return this.$getMediaType() === 'Audio';
+            };
+
+            RlzContent.prototype.$isPlayableAudio = function () {
+                var nonPlayableAudio = ['midi', 'mid', 'sib', 'mus'],
+                    fileType = angular.lowercase(this.$getFileType()),
+                    isPlayable = nonPlayableAudio.indexOf(fileType) === -1;
+
+                return this.$isAudio() && isPlayable;
+            };
+
+            RlzContent.prototype.$isVideo = function () {
+                return this.$getMediaType() === 'Video';
+            };
+
+            RlzContent.prototype.$isEText = function () {
+                return this.$getMediaType() === 'eText';
+            };
+
+            RlzContent.prototype.$isSwf = function () {
+                return this.$getFileType() === 'SWF';
+            };
+
+            RlzContent.prototype.$isDocument = function () {
+                return this.$getMediaType() === 'Document' && !this.$isPdf();
+            };
+
+            RlzContent.prototype.$isPdf = function () {
+                return this.$getFileType() === 'PDF';
+            };
+
+            // determines whether to use the external source player (NBC, Gooru, etc.)
+            RlzContent.prototype.$isExternalSource = function () {
+                return this.$getContribSource() !== 'Pearson' && this.$getExternalSource() !== '';
+            };
+
+            // this is for item types that the url should open in a new window
+            RlzContent.prototype.$isExternalLink = function () {
+                return this.$getMediaType() === 'Link' ||
+                    this.$getMediaType() === 'eText' ||
+                    this.$getMediaType() === 'Leveled Reader' ||
+                    this.$getMediaType() === 'Selected Reading';
+            };
+
+            RlzContent.prototype.$isDownloadOnly = function () {
+                return this.$getViewPermissions() === 'Download Only';
+            };
+
+            RlzContent.prototype.$isDownloadable = function () {
+                return this.$getViewPermissions().search(/download/gi) >= 0;
+            };
+
+            RlzContent.prototype.$isStreamOnly = function () {
+                return this.$getViewPermissions() === 'Stream Only';
+            };
+
+            RlzContent.prototype.$isStreamable = function () {
+                return this.$getViewPermissions().search(/stream/gi) >= 0;
+            };
+
+            // this one really needs to be overridden in order to take advantage of "other" players
+            RlzContent.prototype.$requiresCustomPlayer = function () {
+                return false;
+            };
+
+            // override these getters to map alternative model values
+
+            RlzContent.prototype.$getId = function () {
+                return this.id;
+            };
+
+            RlzContent.prototype.$getVersion = function () {
+                return this.version;
+            };
+
+            RlzContent.prototype.$getTitle = function () {
+                return this.title;
+            };
+
+            RlzContent.prototype.$getDescription = function () {
+                return this.text;
+            };
+
+            RlzContent.prototype.$getMediaType = function () {
+                return this.mediaType;
+            };
+
+            RlzContent.prototype.$getFileType = function () {
+                return this.fileType;
+            };
+
+            RlzContent.prototype.$getUrl = function () {
+                return this.url;
+            };
+
+            // url generally will be direct to the asset, sometimes this is different for playback
+            RlzContent.prototype.$getPlaybackUrl = function () {
+                return this.url;
+            };
+
+            // generally only useful for Audio / Video
+            RlzContent.prototype.$getPlaybackEncoding = function () {
+                // could have more complicated logic here (ogg vorbis, etc.)
+                return this.$isVideo() ? 'video/mp4' : 'audio/x-mp3';
+            };
+
+            RlzContent.prototype.$getPlaybackWidth = function () {
+                return '100%';
+            };
+
+            RlzContent.prototype.$getPlaybackHeight = function () {
+                return '100%';
+            };
+
+            RlzContent.prototype.$getViewPermissions = function () {
+                return this.viewPermissions;
+            };
+
+            RlzContent.prototype.$getFile = function (attachmentIndex) {
+                if (angular.isUndefined(attachmentIndex)) {
+                    attachmentIndex = 0;
+                }
+
+                return this.attachments[attachmentIndex];
+            };
+
+            RlzContent.prototype.$getFileName = function (attachmentIndex) {
+                if (angular.isUndefined(attachmentIndex)) {
+                    attachmentIndex = 0;
+                }
+
+                return this.attachments[attachmentIndex].file;
+            };
+
+            RlzContent.prototype.$getFileUrl = function (attachmentIndex) {
+                if (angular.isUndefined(attachmentIndex)) {
+                    attachmentIndex = 0;
+                }
+
+                return this.attachments[attachmentIndex].url;
+            };
+
+            RlzContent.prototype.$getFileSize = function (attachmentIndex) {
+                if (angular.isUndefined(attachmentIndex)) {
+                    attachmentIndex = 0;
+                }
+
+                return this.attachments[attachmentIndex].size;
+            };
+
+            RlzContent.prototype.$getAttachments = function () {
+                return this.attachments;
+            };
+
+            RlzContent.prototype.$getContributor = function () {
+                return this.contributor;
+            };
+
+            RlzContent.prototype.$getContribSource = function () {
+                return this.contribSource;
+            };
+
+            RlzContent.prototype.$getExternalSource = function () {
+                return this.externalSource;
+            };
+
+            RlzContent.prototype.$getThumbnailUrl = function () {
+                return this.thumbnailUrl;
+            };
+
+            RlzContent.prototype.$getPreviewUrl = function () {
+                return this.previewUrl;
+            };
+
+            RlzContent.prototype.$hasPreviewUrl = function () {
+                return angular.isString(this.$getPreviewUrl()) && this.$getPreviewUrl() !== '';
+            };
+
+            RlzContent.prototype.$getDownloadUrl = function () {
+                return this.$getUrl();
+            };
+
+            RlzContent.prototype.$getPreviews = function () {
+                return this.previews;
+            };
+
+            return RlzContent;
+        }
+    ]);
+angular.module('realize-lib.ui.char-limit', [])
+    .directive('rlzCharLimit', [
+        '$log',
+        function ($log) {
+            'use strict';
+
+            return {
+                restrict: 'A',
+                link: function (scope, el, attrs) {
+                    var limit = parseInt(attrs.charLimit, 10);
+
+                    var onKeyPress = function (event) {
+                        // Once the limit has been met or exceeded, prevent all keypresses from working
+                        if (el.val().length >= limit) {
+                            // Except backspace
+                            if (event.keyCode !== 8) {
+                                event.preventDefault();
+                            }
+                        }
+                    };
+
+                    var onPropertyChange = function () {
+                        // This helps prevent copy and pasting
+                        if (el.val().length >= limit) {
+                            el.val(el.val().substring(0, limit));
+                            scope.$apply();
+                        }
+                    };
+
+                    el.on('keypress', onKeyPress);
+
+                    el.on('input propertychange', onPropertyChange);
+
+                    scope.$on('$destroy', function () {
+                        el.off('keypress', onKeyPress);
+                        el.off('input propertychange', onPropertyChange);
+                    });
+                }
+            };
+        }
+    ]);
+
+angular.module('realize-lib.content.audio-player', [
+    'realize-lib.templates',
+    'realize-lib.content.media-player',
+    'realize-lib.core.filters.file-size',
+    'realize-lib.localization.localize-filter',
+    'realize-lib.localization.messages-service'
+])
+    .config([
+        'MessagesProvider',
+        function (MessagesProvider) {
+            'use strict';
+
+            MessagesProvider.addLanguageFile('rlz-audio-player');
+        }
+    ])
+    .directive('rlzAudioPlayer', [
+        '$window',
+        function ($window) {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    content: '='
+                },
+                templateUrl: '/templates/realize-lib/content/audio-player/audio-player.html',
+                link: function (scope, el, attrs) {
+                    scope.download = function (e) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+
+                        $window.open(scope.content.$getDownloadUrl(), '_blank');
+                    };
+                }
+            };
+
+            return player;
+        }
+    ]);
+// main content viewer/player
+angular.module('realize-lib.content.content-viewer', [
+    'realize-lib.templates',
+    'realize-lib.content.content-model',
+    'realize-lib.content.swf-player',
+    'realize-lib.content.download-only',
+    'realize-lib.content.image-player',
+    'realize-lib.content.link-player',
+    'realize-lib.content.external-player',
+    'realize-lib.content.custom-player',
+    'realize-lib.content.video-player',
+    'realize-lib.content.audio-player',
+    'realize-lib.content.doc-player',
+    'realize-lib.content.pdf-player'
+])
+    .directive('rlzContentViewer', [
+        '$log',
+        'RlzContent',
+        function ($log, RlzContent) {
+            'use strict';
+
+            return {
+                restrict: 'EA',
+                templateUrl: '/templates/realize-lib/content/content-viewer/content-viewer.html',
+                scope: {
+                    content: '=',
+					configuration: '='
+                },
+                link: function (scope, el, attrs) {
+                    if (!(scope.content instanceof RlzContent)) {
+                        throw new Error('Content Item is required to be an instance of RlzContent [realize-lib.content.content-model]');
+                    }
+                }
+            };
+        }
+    ]);
+
+angular.module('realize-lib.content.custom-player', [
+    'realize-lib.templates',
+    'realize-lib.content.content-model'
+])
+    // this directive is designed to be a placeholder for playing other types of content that the
+    // main rlz-content-viewer does not already support; simply override the template to inlcude your own directives
+    // for playback, the entire content item will be passed into scope for use with this
+    .directive('rlzCustomPlayer', [
+        'RlzContent',
+        function (RlzContent) {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    content: '=',
+					configuration: '='
+                },
+                templateUrl: '/templates/realize-lib/content/custom-player/custom-player.html',
+                link: function (scope, el, attrs) {
+                    if (!(scope.content instanceof RlzContent)) {
+                        throw new Error('Content Item is required to be an instance of RlzContent [realize-lib.content.content-model]');
+                    }
+                }
+            };
+
+            return player;
+        }
+    ]);
+
+angular.module('realize-lib.content.doc-player', [
+    'realize-lib.templates',
+    'realize-lib.localization.localize-filter',
+    'realize-lib.localization.messages-service'
+])
+    .config([
+        'MessagesProvider',
+        function (MessagesProvider) {
+            'use strict';
+
+            MessagesProvider.addLanguageFile('rlz-doc-player');
+        }
+    ])
+    .directive('rlzDocPlayer', [
+        '$log',
+        function ($log) {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    pages: '='
+                },
+                templateUrl: '/templates/realize-lib/content/doc-player/doc-player.html'
+            };
+
+            return player;
+        }
+    ]);
+// main content viewer/player
+angular.module('realize-lib.content.download-only', [
+    'realize-lib.templates',
+    'realize-lib.content.content-model',
+    'realize-lib.localization.messages-service',
+    'realize-lib.localization.localize-filter',
+    'realize-lib.core.filters.underscores',
+    'realize-lib.content.media-icon-filter',
+    'realize-lib.core.filters.file-size',
+    'realize-lib.core.filters.snake'
+])
+    .config([
+        'MessagesProvider',
+        function (MessagesProvider) {
+            'use strict';
+
+            MessagesProvider.addLanguageFile('rlz-download-only');
+        }
+    ])
+    .directive('rlzDownloadOnly', [
+        '$log',
+        'RlzContent',
+        '$window',
+        function ($log, RlzContent, $window) {
+            'use strict';
+
+            return {
+                restrict: 'EA',
+                templateUrl: '/templates/realize-lib/content/download-only/download-only.html',
+                scope: {
+                    content: '='
+                },
+                link: function (scope, el, attrs) {
+                    if (!(scope.content instanceof RlzContent)) {
+                        throw new Error('Content Item is required to be an instance of RlzContent [realize-lib.content.content-model]');
+                    }
+
+                    scope.download = function (e) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+
+                        $window.open(scope.content.$getDownloadUrl(), '_blank');
+                    };
+                }
+            };
+        }
+    ]);
+
+angular.module('realize-lib.content.external-player', [
+    'realize-lib.templates'
+])
+// the external player is designed for any type of item that should be played in an iframe (like a SCO or NBC video, etc.)
+.directive('rlzExternalPlayer', [
+
+    function () {
+        'use strict';
+
+        var player = {
+            restrict: 'EA',
+            scope: {
+                srcUrl: '@',
+                width: '@?',
+                height: '@?'
+            },
+            templateUrl: '/templates/realize-lib/content/external-player/external-player.html',
+            link: function (scope, el, attrs) {
+                // TODO: auto resize iframe logic
+            }
+        };
+
+        return player;
+    }
+]);
+
+angular.module('realize-lib.content.image-player', [])
+    .directive('rlzImagePlayer', [
+
+        function () {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    srcUrl: '@',
+                    altText: '@'
+                },
+                templateUrl: '/templates/realize-lib/content/image-player/image-player.html'
+            };
+
+            return player;
+        }
+    ]);
+
+// the link player is designed for any type of link that should be "open in a new window/tab"
+angular.module('realize-lib.content.link-player', [
+    'realize-lib.templates',
+    'realize-lib.localization.localize-filter',
+    'realize-lib.localization.messages-service'
+])
+    .config([
+        'MessagesProvider',
+        function (MessagesProvider) {
+            'use strict';
+
+            MessagesProvider.addLanguageFile('rlz-link-player');
+        }
+    ])
+    .directive('rlzLinkPlayer', [
+        '$log',
+        function ($log) {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    launchUrl: '@',
+                    altText: '@',
+                    thumbnailUrl: '@',
+                    previewUrl: '@'
+                },
+                templateUrl: '/templates/realize-lib/content/link-player/link-player.html',
+                link: function (scope, el, attrs) {
+                    scope.hasThumbnail = function () {
+                        return angular.isString(scope.thumbnailUrl) && scope.thumbnailUrl !== '';
+                    };
+
+                    var previewImg = el.find('.link-player-preview-image');
+                    $log.debug('link preview: ', previewImg, ' :: ', scope.previewUrl);
+
+                    if (angular.isString(scope.previewUrl) && scope.previewUrl !== '') {
+                        previewImg.css('visibility', 'visible');
+                    } else {
+                        previewImg.css('visibility', 'hidden');
+                    }
+                }
+            };
+
+            return player;
+        }
+    ]);
+angular.module('realize-lib.content.media-icon-filter', [
+    'realize-lib.core.filters.underscores'
+])
+    .filter('mediaIcon', [
+        '$filter',
+        function ($filter) {
+            'use strict';
+
+            return function (input) {
+                if (!angular.isDefined(input) || input === null ||
+                    !angular.isDefined(input.mediaType) ||
+                    !angular.isDefined(input.fileType)) {
+                    return;
+                }
+
+                var mediaType = angular.lowercase(input.mediaType),
+                    fileType = angular.lowercase(input.fileType);
+
+                // is it a document?
+                if (mediaType === 'document') {
+                    if (fileType.indexOf('doc') !== -1) {
+                        return 'document';
+                    }
+                    if (fileType.indexOf('txt') !== -1) {
+                        return 'document';
+                    }
+                    if (fileType.indexOf('rtf') !== -1) {
+                        return 'document';
+                    }
+                    if (fileType.indexOf('ppt') !== -1) {
+                        return 'slideshow';
+                    }
+                    if (fileType.indexOf('pdf') !== -1) {
+                        return 'pdf';
+                    }
+                }
+
+                // is it visual learning?
+                if (input.contentType === 'Visual Learning') {
+                    return 'visual_learning';
+                }
+
+                // is it remediation?
+                if (mediaType.indexOf('remediation') !== -1) {
+                    return 'lesson';
+                }
+
+                // default to using the mediaType
+                return $filter('underscores')(mediaType);
+            };
+        }
+    ]);
+
+angular.module('realize-lib.content.media-player', [
+    'realize-lib.content.media-player.mejs',
+    'realize-lib.core.services.browser-info',
+    'realize-lib.core.filters.cache-buster'
+])
+    // this is the mediaelement player used by the rlz-video-player and rlz-audio-player
+    // because those 2 players have custom wrapper templates
+    .directive('rlzMediaPlayer', [
+        'mejs',
+        '$filter',
+        '$timeout',
+        'BrowserInfo',
+        function (mejs, $filter, $timeout, BrowserInfo) {
+            'use strict';
+
+            //override the current supported types to allow x-mp3 (RGHT-7810)
+            mejs.plugins.flash = [{
+                version: [9, 0, 124],
+                types: [
+                    'video/mp4',
+                    'video/m4v',
+                    'video/mov',
+                    'video/flv',
+                    'video/rtmp',
+                    'video/x-flv',
+                    'audio/flv',
+                    'audio/x-flv',
+                    'audio/mp3',
+                    'audio/xmp3',
+                    'audio/x-mp3',
+                    'audio/m4a',
+                    'audio/mpeg',
+                    'video/youtube',
+                    'video/x-youtube'
+                ]
+            }];
+
+            var dir = {
+                restrict: 'EA',
+                scope: {
+                    src: '@',
+                    mediaType: '@',
+                    encoding: '@'
+                },
+                templateUrl: '/templates/realize-lib/content/media-player/media-player.html',
+                link: function (scope, el, attrs) {
+                    scope.encoding = scope.encoding || (scope.mediaType === 'audio' ? 'audio/mp3' : 'video/mp4');
+
+                    scope.$watch('src', function (newValue) {
+                        if (!newValue) {
+                            return;
+                        }
+
+                        // needed for RGHT-11672
+                        if (BrowserInfo.browser.isMSIE || BrowserInfo.browser.isChrome) {
+                            scope.srcVideo = $filter('cacheBuster')(newValue);
+                        } else {
+                            scope.srcVideo = newValue;
+                        }
+
+                        scope.srcAudio = newValue;
+
+                        // needs a little time to render
+                        $timeout(function () {
+                            var configs = {};
+
+                            // if we are displaying audio...
+                            if (attrs.mediaType === 'audio') {
+                                //let's force mozilla to use flash. It seems that on FF on some windows machines x-mp3 won't player natively
+                                //Additionally on windows machines IE doesn't behave well so also force flash there
+                                if (BrowserInfo.browser.isFirefox || BrowserInfo.browser.isMSIE) {
+                                    configs.mode = 'shim';
+                                }
+                                // if we are displaying video...
+                            } else {
+                                //force flash for IE because variations in the content-type response header cause issues in html5
+                                if (BrowserInfo.browser.isMSIE) {
+                                    configs.mode = 'shim';
+                                }
+                            }
+
+                            //initialize the mediaelementplayer
+                            el.find(attrs.mediaType).mediaelementplayer(configs);
+
+                        }, 100);
+
+                    });
+
+                    scope.$on('$destroy', function () {
+                        angular.element('.mejs-container .mejs-pause').click();
+                        angular.element('body > .me-plugin').remove();
+                    });
+                }
+            };
+
+            return dir;
+        }
+    ]);
+// rlz-media-player directive depends on 3rd party vendor lib: mediaelementplayer
+angular.module('realize-lib.content.media-player.mejs', [])
+    .service('mejs', [
+        '$window',
+        function ($window) {
+            'use strict';
+
+            if (!$window.mejs) {
+                throw new Error('mediaelementjs is required: http://mediaelementjs.com/');
+            }
+
+            return $window.mejs;
+        }
+    ]);
+// rlz-pdf-player directive depends on 3rd party vendor lib: pdfjs-dist
+angular.module('realize-lib.content.pdf-player', [])
+    .directive('rlzPdfPlayer', [
+        '$log',
+        function ($log) {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    srcUrl: '@'
+                },
+                templateUrl: '/templates/realize-lib/content/pdf-player/pdf-player.html',
+                link: function (scope, el, attrs) {
+                    // In cases when the pdf.worker.js is located at the different folder than the
+                    // pdf.js's one, or the pdf.js is executed via eval(), the workerSrc property
+                    // shall be specified.
+                    //
+                    // PDFJS.workerSrc = '../../build/pdf.worker.js';
+
+                    // Some PDFs need external cmaps.
+                    //
+                    // PDFJS.cMapUrl = '../../external/bcmaps/';
+                    // PDFJS.cMapPacked = true;
+
+                    PDFJS.disableCreateObjectURL = true; // disable ObjectUrl creation from Blob API for legacy browsers
+
+                    var container = el.children()[0];
+
+                    // Loading document.
+                    PDFJS.getDocument(scope.srcUrl).then(function (pdfDocument) {
+                        // initialize the viewer
+                        var pdfViewer = new PDFJS.PDFViewer({
+                            container: container
+                        });
+
+                        container.addEventListener('pagesinit', function () {
+                            // we can use pdfViewer now, e.g. let's change default scale.
+                            pdfViewer.currentScaleValue = 'page-width';
+                        });
+
+                        // Document loaded, specifying document for the viewer.
+                        pdfViewer.setDocument(pdfDocument);
+                    });
+                }
+            };
+
+            return player;
+        }
+    ]);
+angular.module('realize-lib.content.swf-player-service', [])
+    .service('rlzSwfPlayerSvc', [
+        '$log',
+        function ($log) {
+            'use strict';
+
+            var svc = this;
+
+            svc.getAdjustedSize = function (srcWidth, srcHeight, maxWidth, maxHeight) {
+                var finalSize;
+
+                // resize the SWF render size if it exceeds guidelines
+                if (srcWidth > maxWidth || srcHeight > maxHeight) {
+                    // if the source is landscape
+                    if (srcWidth >= srcHeight) {
+                        // give preference to sizing width first
+                        if (srcWidth > maxWidth) {
+                            finalSize = svc.scaleDimensions(srcWidth, srcHeight, 'width', maxWidth);
+                        } else if (srcHeight > maxHeight) {
+                            finalSize = svc.scaleDimensions(srcWidth, srcHeight, 'height', maxHeight);
+                        }
+                        // if the source is portrait
+                    } else if (srcWidth < srcHeight) {
+                        // give preference to sizing height first
+                        if (srcHeight > maxHeight) {
+                            finalSize = svc.scaleDimensions(srcWidth, srcHeight, 'height', maxHeight);
+                        } else if (srcWidth > maxWidth) {
+                            finalSize = svc.scaleDimensions(srcWidth, srcHeight, 'width', maxWidth);
+                        }
+                    }
+                    $log.log('original SWFSize: ' + srcWidth + ' x ' + srcHeight);
+                } else {
+                    finalSize = {
+                        width: srcWidth,
+                        height: srcHeight
+                    };
+                }
+                $log.log('finalSize: ' + finalSize.width + ' x ' + finalSize.height);
+
+                return finalSize;
+            };
+
+            svc.scaleDimensions = function (srcWidth, srcHeight, dimensionToResize, resizeValue) {
+                var newWidth, newHeight;
+
+                if (dimensionToResize === 'width') {
+                    newWidth = resizeValue;
+                    newHeight = Math.round((resizeValue / srcWidth) * srcHeight);
+                } else if (dimensionToResize === 'height') {
+                    newWidth = Math.round((resizeValue / srcHeight) * srcWidth);
+                    newHeight = resizeValue;
+                }
+
+                var resizedDimensions = {
+                    width: newWidth,
+                    height: newHeight
+                };
+
+                return resizedDimensions;
+            };
+        }
+    ]);
+
+angular.module('realize-lib.content.swf-player', [
+    'realize-lib.templates',
+    'realize-lib.content.swf-player.swfobject',
+    'realize-lib.content.swf-player-service',
+    'realize-lib.localization.localize-filter',
+    'realize-lib.localization.messages-service'
+])
+    .config([
+        'MessagesProvider',
+        function (MessagesProvider) {
+            'use strict';
+
+            MessagesProvider.addLanguageFile('rlz-swf-player');
+        }
+    ])
+    .directive('rlzSwfPlayer', [
+        'rlzSwfPlayerSvc',
+        'swfobject',
+        function (rlzSwfPlayerSvc, swfobject) {
+            'use strict';
+
+            return {
+                restrict: 'EA',
+                replace: true,
+                templateUrl: '/templates/realize-lib/content/swf-player/swf-player.html',
+                scope: {
+                    srcUrl: '@',
+                    swfOptions: '=?'
+                },
+                link: function (scope, el, attrs) {
+                    var adjustedSize,
+                        params,
+                        minFlashPlayerVersion = '8.0.0',
+                        targetId = 'SWF_container_small';
+
+                    scope.swfOptions = scope.swfOptions || {};
+
+                    // defaults from OLE
+                    scope.maxWidth = scope.swfOptions.maxWidth || 930;
+                    scope.maxHeight = scope.swfOptions.maxHeight || 497;
+                    scope.srcWidth = scope.swfOptions.srcWidth || scope.maxWidth;
+                    scope.srcHeight = scope.swfOptions.srcHeight || scope.maxHeight;
+                    scope.sAlign = scope.swfOptions.sAlign || '';
+                    scope.bgColor = scope.swfOptions.bgColor || '#cccccc';
+
+                    // TODO: is this enough for ipad?
+                    scope.flashSupported = swfobject.hasFlashPlayerVersion('1');
+
+                    if (scope.flashSupported) {
+                        adjustedSize = rlzSwfPlayerSvc.getAdjustedSize(scope.srcWidth, scope.srcHeight, scope.maxWidth, scope.maxHeight);
+
+                        params = {
+                            bgcolor: scope.bgColor,
+                            salign: scope.sAlign
+                        };
+                        swfobject.embedSWF(scope.srcUrl, targetId, adjustedSize.width, adjustedSize.height, minFlashPlayerVersion, false, null, params, null);
+                    }
+                }
+            };
+        }
+    ]);
+
+// rlz-swf-player directive depends on 3rd party vendor lib: swfobject
+angular.module('realize-lib.content.swf-player.swfobject', [])
+    .service('swfobject', [
+        '$window',
+        function ($window) {
+            'use strict';
+
+            if (!$window.swfobject) {
+                throw new Error('swfobject is required: https://code.google.com/p/swfobject/');
+            }
+
+            return $window.swfobject;
+        }
+    ]);
+
+angular.module('realize-lib.content.video-player', [
+    'realize-lib.templates',
+    'realize-lib.content.media-player'
+])
+    .directive('rlzVideoPlayer', [
+
+        function () {
+            'use strict';
+
+            var player = {
+                restrict: 'EA',
+                scope: {
+                    content: '='
+                },
+                templateUrl: '/templates/realize-lib/content/video-player/video-player.html'
+            };
+
+            return player;
+        }
+    ]);
+angular.module('realize-lib.core.filters.cache-buster', [])
+    .filter('cacheBuster', [
+
+        function () {
+            'use strict';
+
+            return function (input) {
+                if (!angular.isString(input)) {
+                    return;
+                }
+
+                var d = new Date();
+                input += input.indexOf('?') >= 0 ? '&' : '?';
+                input += 'cache_buster=' + d.getTime();
+
+                return input;
+            };
+        }
+    ]);
+
+angular.module('realize-lib.core.filters.capitalize', [])
+    .filter('capitalize', function () {
+        'use strict';
+        return function (input) {
+            return angular.uppercase(input.charAt(0)) + angular.lowercase(input.substr(1));
+        };
+    });
+angular.module('realize-lib.core.filters.coerce', [])
+    .filter('coerce', [
+        '$log',
+        '$injector',
+        function ($log, $injector) {
+            'use strict';
+
+            return function (data, toType) {
+                if (angular.isUndefined(data) || angular.isUndefined(toType)) {
+                    $log.debug('coerce: missing parameters');
+                    return;
+                }
+
+                var returnData = [],
+                    EntityType = angular.isFunction(toType) ? toType : $injector.get(toType);
+
+                if (!EntityType) {
+                    $log.debg('coerce: bad EntityType (not found)');
+                    return;
+                }
+
+                // if it is an array of objects convert each one
+                if (angular.isArray(data)) {
+                    angular.forEach(data, function (d) {
+                        returnData.push(new EntityType(d));
+                    });
+
+                    return returnData;
+                } else {
+                    return new EntityType(data);
+                }
+            };
+        }
+    ]);
+
+angular.module('realize-lib.core.filters.contains', [])
+    .filter('contains', function () {
+        'use strict';
+
+        return function (input, match, flags) {
+            if (!input) {
+                return false;
+            }
+
+            if (!flags) {
+                flags = 'ig';
+            }
+
+            var rx = new RegExp(match, flags);
+
+            return input.search(rx) >= 0;
+        };
+    });
+
+angular.module('realize-lib.core.filters.ellipses', [])
+    .filter('ellipses', function () {
+        'use strict';
+
+        return function (input, len, ellipsis) {
+            if (!input || !len) {
+                return;
+            }
+
+            if (!ellipsis) {
+                ellipsis = '...';
+            }
+
+            if (input.length <= len) {
+                return input;
+            } else {
+                return input.substr(0, len) + ellipsis;
+            }
+        };
+    });
+
+// fileSize.js
+angular.module('realize-lib.core.filters.file-size', [])
+    .filter('fileSize', function () {
+        'use strict';
+
+        // these methods adapted to angular from OLE's util.js
+        var numFormat = function (number, decimals, decimalPoint, thousandsSeparator) {
+            number = number.toString().replace(',', '').replace(' ', '');
+
+            var n = !isFinite(+number) ? 0 : +number,
+                prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
+                sep = thousandsSeparator ? ',' : thousandsSeparator,
+                dec = decimalPoint ? '.' : decimalPoint,
+                s = '',
+                toFixedFix = function (n, prec) {
+                    var k = Math.pow(10, prec);
+                    return (Math.round(n * k) / k).toString();
+                };
+
+            // Fix for IE parseFloat(0.55).toFixed(0) = 0;
+            s = (prec ? toFixedFix(n, prec) : Math.round(n).toString()).split('.');
+            if (s[0].length > 3) {
+                s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+            }
+
+            if ((s[1] || '').length < prec) {
+                s[1] = s[1] || '';
+                while (s[1].length < prec) {
+                    s[1] += '0';
+                }
+            }
+
+            return s.join(dec);
+        };
+
+        return function (input) {
+            var filesize;
+
+            if (!input) {
+                return 'N/A';
+            }
+
+            if (input >= 1073741824) {
+                filesize = numFormat(input / 1073741824, 2, '.', '') + ' GB';
+            } else {
+                if (input >= 1048576) {
+                    filesize = numFormat(input / 1048576, 2, '.', '') + ' MB';
+                } else {
+                    if (input >= 1024) {
+                        filesize = numFormat(input / 1024, 0) + ' KB';
+                    } else {
+                        filesize = numFormat(input, 0) + ' bytes';
+                    }
+                }
+            }
+
+            return filesize;
+        };
+    });
+
+angular.module('realize-lib.core.filters.get-extension', [])
+    .filter('getExtension', function () {
+        'use strict';
+
+        return function (input, fallback) {
+            var index = input.lastIndexOf('.'),
+                extension = input.slice(index);
+
+            return (index === -1) ? fallback : extension;
+        };
+    });
+
+angular.module('realize-lib.core.filters.snake', [])
+    .filter('snake', [
+
+        function () {
+            'use strict';
+
+            function snakeFilter(input) {
+                if (!angular.isString(input)) {
+                    return input;
+                }
+
+                return angular.lowercase(input.replace(/[^a-z0-9]+/gi, '-').replace(/^-*|-*$/g, ''));
+            }
+
+            return snakeFilter;
+        }
+    ]);
+
+angular.module('realize-lib.core.filters.strip-extension', [])
+    .filter('stripExtension', [
+        '$filter',
+        function ($filter) {
+            'use strict';
+
+            return function (input) {
+                var index = input.lastIndexOf('.');
+
+                return (index === -1) ? input : input.substring(0, index);
+            };
+        }
+    ]);
+
+angular.module('realize-lib.core.filters.strip-whitespace', [])
+    .filter('stripWhitespace', function () {
+        'use strict';
+
+        return function (input) {
+            if (!input) {
+                return;
+            }
+
+            return input.replace(' ', '');
+        };
+    });
+
+angular.module('realize-lib.core.filters.trunc', [])
+    .filter('trunc', function () {
+        'use strict';
+
+        return function (input, len) {
+            if (!input || !len) {
+                return;
+            }
+
+            return input.substr(0, len);
+        };
+    });
+
+angular.module('realize-lib.core.filters.underscores', [])
+    .filter('underscores', function () {
+        'use strict';
+
+        return function (input) {
+            if (!input) {
+                return;
+            }
+
+            return input.replace(/ /g, '_');
+        };
+    });
+
+// debounce.js
+// http://unscriptable.com/2009/03/20/debouncing-javascript-methods/
+
+angular.module('realize-lib.core.services.debounce', [])
+    .factory('$debounce', [
+        '$rootScope',
+        '$browser',
+        '$q',
+        '$exceptionHandler',
+        function ($rootScope, $browser, $q, $exceptionHandler) {
+            'use strict';
+
+            var deferreds = {},
+                methods = {},
+                uuid = 0;
+
+            function debounce(fn, delay, invokeApply) {
+                var deferred = $q.defer(),
+                    promise = deferred.promise,
+                    skipApply = (angular.isDefined(invokeApply) && !invokeApply),
+                    timeoutId, cleanup,
+                    methodId, bouncing = false;
+
+                // check we dont have this method already registered
+                angular.forEach(methods, function (value, key) {
+                    if (angular.equals(methods[key].fn, fn)) {
+                        bouncing = true;
+                        methodId = key;
+                    }
+                });
+
+                // not bouncing, then register new instance
+                if (!bouncing) {
+                    methodId = uuid++;
+                    methods[methodId] = {
+                        fn: fn
+                    };
+                } else {
+                    // clear the old timeout
+                    deferreds[methods[methodId].timeoutId].reject('bounced');
+                    $browser.defer.cancel(methods[methodId].timeoutId);
+                }
+
+                var debounced = function () {
+                    // actually executing? clean method bank
+                    delete methods[methodId];
+
+                    try {
+                        deferred.resolve(fn());
+                    } catch (e) {
+                        deferred.reject(e);
+                        $exceptionHandler(e);
+                    }
+
+                    if (!skipApply) {
+                        $rootScope.$apply();
+                    }
+                };
+
+                timeoutId = $browser.defer(debounced, delay);
+
+                // track id with method
+                methods[methodId].timeoutId = timeoutId;
+
+                cleanup = function (reason) {
+                    delete deferreds[promise.$$timeoutId];
+                };
+
+                promise.$$timeoutId = timeoutId;
+                deferreds[timeoutId] = deferred;
+                promise.then(cleanup, cleanup);
+
+                return promise;
+            }
+
+
+            // similar to angular's $timeout cancel
+            debounce.cancel = function (promise) {
+                if (promise && deferreds.hasOwnProperty(promise.$$timeoutId)) {
+                    deferreds[promise.$$timeoutId].reject('canceled');
+                    return $browser.defer.cancel(promise.$$timeoutId);
+                }
+                return false;
+            };
+
+            return debounce;
+        }
+    ]);
+// this is generally only used for admin functions, only supports Chrome
+angular.module('realize-lib.core.services.filesystem', [])
+    .factory('fileSystem', [
+        '$q',
+        '$timeout',
+        '$window',
+        function ($q, $timeout, $window) {
+            'use strict';
+
+            var fsDefer = $q.defer();
+
+            var DEFAULT_QUOTA_MB = 5;
+
+            //wrap resolve/reject in an empty $timeout so it happens within the Angular call stack
+            //easier than .apply() since no scope is needed and doesn't error if already within an apply
+            function safeResolve(deferred, message) {
+                $timeout(function () {
+                    deferred.resolve(message);
+                });
+            }
+
+            function safeReject(deferred, message) {
+                $timeout(function () {
+                    deferred.reject(message);
+                });
+            }
+
+            $window.webkitStorageInfo.requestQuota($window.PERSISTENT, DEFAULT_QUOTA_MB * 1024 * 1024, function (grantedBytes) {
+                $window.webkitRequestFileSystem($window.PERSISTENT, grantedBytes, function (fs) {
+                    safeResolve(fsDefer, fs);
+                }, function (e) {
+                    safeReject(fsDefer, {
+                        text: 'Error requesting File System access',
+                        obj: e
+                    });
+                });
+            }, function (e) {
+                safeReject(fsDefer, {
+                    text: 'Error requesting Quota',
+                    obj: e
+                });
+            });
+
+            var fileSystem = {
+                getCurrentUsage: function () {
+                    var def = $q.defer();
+
+                    $window.webkitStorageInfo.queryUsageAndQuota($window.PERSISTENT, function (used, quota) {
+                        safeResolve(def, {
+                            'used': used,
+                            'quota': quota
+                        });
+                    }, function (e) {
+                        safeReject(def, {
+                            text: 'Error getting quota information',
+                            obj: e
+                        });
+                    });
+
+                    return def.promise;
+                },
+                requestQuotaIncrease: function (newQuotaMB) {
+                    var def = $q.defer();
+
+                    $window.webkitStorageInfo.requestQuota($window.PERSISTENT, newQuotaMB * 1024 * 1024, function (grantedBytes) {
+                        safeResolve(def, grantedBytes);
+                    }, function (e) {
+                        safeReject(def, {
+                            text: 'Error requesting quota increase',
+                            obj: e
+                        });
+                    });
+
+                    return def.promise;
+                },
+                getFolderContents: function (dir) {
+                    var def = $q.defer();
+
+                    fsDefer.promise.then(function (fs) {
+                        fs.root.getDirectory(fs.root.fullPath + dir, {}, function (dirEntry) {
+                            var dirReader = dirEntry.createReader();
+                            dirReader.readEntries(function (entries) {
+                                safeResolve(def, entries);
+                            }, function (e) {
+                                safeReject(def, {
+                                    text: 'Error reading entries',
+                                    obj: e
+                                });
+                            });
+                        }, function (e) {
+                            safeReject(def, {
+                                text: 'Error getting directory',
+                                obj: e
+                            });
+                        });
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                },
+                createFolder: function (path) {
+                    //remove leading slash if present
+                    path = path.replace(/^\//, '');
+
+                    var def = $q.defer();
+
+                    function createDir(rootDir, folders) {
+                        rootDir.getDirectory(folders[0], {
+                            create: true
+                        }, function (dirEntry) {
+                            if (folders.length) {
+                                createDir(dirEntry, folders.slice(1));
+                            } else {
+                                safeResolve(def, dirEntry);
+                            }
+                        }, function (e) {
+                            safeReject(def, {
+                                text: 'Error creating directory',
+                                obj: e
+                            });
+                        });
+                    }
+
+                    fsDefer.promise.then(function (fs) {
+                        createDir(fs.root, path.split('/'));
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                },
+                deleteFolder: function (path, recursive) {
+                    recursive = (typeof recursive === 'undefined' ? false : recursive);
+
+                    var def = $q.defer();
+
+                    fsDefer.promise.then(function (fs) {
+                        fs.root.getDirectory(path, {}, function (dirEntry) {
+                            var success = function () {
+                                safeResolve(def, '');
+                            };
+                            var err = function (e) {
+                                safeReject(def, {
+                                    text: 'Error removing directory',
+                                    obj: e
+                                });
+                            };
+
+                            if (recursive) {
+                                dirEntry.removeRecursively(success, err);
+                            } else {
+                                dirEntry.remove(success, err);
+                            }
+                        }, function (e) {
+                            safeReject(def, {
+                                text: 'Error getting directory',
+                                obj: e
+                            });
+                        });
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                },
+                writeFileInput: function (filename, file, mimeString) {
+                    var def = $q.defer();
+
+                    var reader = new window.FileReader();
+
+                    reader.onload = function (e) {
+                        var buf = e.target.result;
+
+                        $timeout(function () {
+                            fileSystem.writeArrayBuffer(filename, buf, mimeString).then(function () {
+                                safeResolve(def, '');
+                            }, function (e) {
+                                safeReject(def, e);
+                            });
+                        });
+                    };
+
+                    reader.readAsArrayBuffer(file);
+
+                    return def.promise;
+                },
+                writeText: function (fileName, contents, append) {
+                    append = (typeof append === 'undefined' ? false : append);
+
+                    //create text blob from string
+                    var blob = new $window.Blob([contents], {
+                        type: 'text/plain'
+                    });
+
+                    return fileSystem.writeBlob(fileName, blob, append);
+                },
+                writeJSON: function (fileName, contents, append) {
+                    append = (typeof append === 'undefined' ? false : append);
+
+                    //create text blob from string
+                    var blob = new $window.Blob([contents], {
+                        type: 'application/json;charset=UTF-8'
+                    });
+
+                    return fileSystem.writeBlob(fileName, blob, append);
+                },
+                writeArrayBuffer: function (fileName, buf, mimeString, append) {
+                    append = (typeof append === 'undefined' ? false : append);
+
+                    var blob = new $window.Blob([new window.Uint8Array(buf)], {
+                        type: mimeString
+                    });
+
+                    return fileSystem.writeBlob(fileName, blob, append);
+                },
+                writeBlob: function (fileName, blob, append) {
+                    append = (typeof append === 'undefined' ? false : append);
+
+                    var def = $q.defer();
+
+                    fsDefer.promise.then(function (fs) {
+
+                        fs.root.getFile(fileName, {
+                            create: true
+                        }, function (fileEntry) {
+
+                            fileEntry.createWriter(function (fileWriter) {
+                                if (append) {
+                                    fileWriter.seek(fileWriter.length);
+                                }
+
+                                var truncated = false;
+                                fileWriter.onwriteend = function (e) {
+                                    //truncate all data after current position
+                                    if (!truncated) {
+                                        truncated = true;
+                                        this.truncate(this.position);
+                                        return;
+                                    }
+                                    safeResolve(def, fileEntry.toURL());
+                                };
+
+                                fileWriter.onerror = function (e) {
+                                    safeReject(def, {
+                                        text: 'Write failed',
+                                        obj: e
+                                    });
+                                };
+
+                                fileWriter.write(blob);
+
+                            }, function (e) {
+                                safeReject(def, {
+                                    text: 'Error creating file',
+                                    obj: e
+                                });
+                            });
+
+                        }, function (e) {
+                            safeReject(def, {
+                                text: 'Error getting file',
+                                obj: e
+                            });
+                        });
+
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                },
+                readFile: function (fileName, returnType) {
+                    var def = $q.defer();
+
+                    returnType = returnType || 'text';
+
+                    fsDefer.promise.then(function (fs) {
+                        fs.root.getFile(fileName, {}, function (fileEntry) {
+                            // Get a File object representing the file,
+                            // then use FileReader to read its contents.
+                            fileEntry.file(function (file) {
+                                var reader = new $window.FileReader();
+
+                                reader.onloadend = function () {
+                                    safeResolve(def, this.result);
+                                };
+
+                                reader.onerror = function (e) {
+                                    safeReject(def, {
+                                        text: 'Error reading file',
+                                        obj: e
+                                    });
+                                };
+
+
+                                switch (returnType) {
+                                case 'arraybuffer':
+                                    reader.readAsArrayBuffer(file);
+                                    break;
+                                case 'binarystring':
+                                    reader.readAsBinaryString(file);
+                                    break;
+                                case 'dataurl':
+                                    reader.readAsDataURL(file);
+                                    break;
+                                default:
+                                    reader.readAsText(file);
+                                }
+                            }, function (e) {
+                                safeReject(def, {
+                                    text: 'Error getting file',
+                                    obj: e
+                                });
+                            });
+                        }, function (e) {
+                            safeReject(def, {
+                                text: 'Error getting file',
+                                obj: e
+                            });
+                        });
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                },
+                deleteFile: function (fullPath) {
+                    var def = $q.defer();
+
+                    fsDefer.promise.then(function (fs) {
+                        fs.root.getFile(fullPath, {
+                            create: false
+                        }, function (fileEntry) {
+                            fileEntry.remove(function () {
+                                safeResolve(def, '');
+                            }, function (e) {
+                                safeReject(def, {
+                                    text: 'Error deleting file',
+                                    obj: e
+                                });
+                            });
+                        });
+                    }, function (err) {
+                        def.reject(err);
+                    });
+
+                    return def.promise;
+                }
+            };
+
+            return fileSystem;
+        }
+    ]);
+angular.module('realize-lib.core.services.log', [])
+    .value('LOG_LEVEL', 5)
+    .config(['$provide',
+        function ($provide) {
+            'use strict';
+
+            $provide.decorator('$log', ['LOG_LEVEL', '$delegate',
+                function (LOG_LEVEL, $delegate) {
+                    var log = $delegate.log,
+                        debug = $delegate.debug,
+                        warn = $delegate.warn,
+                        info = $delegate.info,
+                        error = $delegate.error;
+
+                    $delegate.log = function () {
+                        if (LOG_LEVEL >= 3) {
+                            log.apply($delegate, arguments);
+                        }
+                    };
+
+                    $delegate.debug = function () {
+                        if (LOG_LEVEL >= 5) {
+                            debug.apply($delegate, arguments);
+                        }
+                    };
+
+                    $delegate.warn = function () {
+                        if (LOG_LEVEL >= 2) {
+                            warn.apply($delegate, arguments);
+                        }
+                    };
+
+                    $delegate.info = function () {
+                        if (LOG_LEVEL >= 4) {
+                            info.apply($delegate, arguments);
+                        }
+                    };
+
+                    $delegate.error = function () {
+                        if (LOG_LEVEL >= 1) {
+                            error.apply($delegate, arguments);
+                        }
+                    };
+
+                    return $delegate;
+                }
+            ]);
+        }
+    ]);
+
+angular.module('realize-lib.core.services.poller', [])
+    .service('Poller', [
+        '$http',
+        '$q',
+        '$timeout',
+        '$log',
+        function ($http, $q, $timeout, $log) {
+            'use strict';
+
+            var polls = {};
+
+            var service = this;
+
+            var doPoll = function (promise, name, method, interval) {
+                return promise.then(function (result) {
+                    if (polls[name] && polls[name].status === 'polling') {
+                        polls[name].poll = $timeout(method, interval);
+                        doPoll(polls[name].poll, name, method, interval);
+                        polls[name].deferred.notify(result);
+                    } else {
+                        service.stop(name);
+                    }
+                }, function (err) {
+                    $log.log(name + ' timeout rejected: ', err);
+                    if (polls[name] && polls[name].deferred) {
+                        return polls[name].deferred.reject(err);
+                    }
+                });
+            };
+
+            this.start = function (name, method, interval) {
+                var deferred = $q.defer();
+
+                if (polls[name]) {
+                    return polls[name].deferred.promise;
+                } else {
+                    polls[name] = {};
+                    polls[name].method = method;
+                    polls[name].interval = interval;
+                    polls[name].deferred = deferred;
+                    polls[name].status = 'polling';
+
+                    polls[name].poll = $timeout(method, interval);
+                    doPoll(polls[name].poll, name, method, interval);
+
+                    return polls[name].deferred.promise;
+                }
+            };
+
+            this.stop = function (name) {
+                if (polls[name]) {
+                    $timeout.cancel(polls[name].poll);
+                    polls[name].status = 'stopped';
+                    polls[name].deferred.reject('stopped');
+                } else {
+                    $log.warn('no poller found: ', name);
+                }
+            };
+
+            this.list = function () {
+                return Object.keys(polls);
+            };
+
+            this.$$getPolls = function () {
+                return polls;
+            };
+
+            this.clearAll = function () {
+                var self = this;
+                angular.forEach(polls, function (value, key) {
+                    self.clear(key);
+                });
+            };
+
+            this.clear = function (name) {
+                this.stop(name);
+                delete polls[name];
+            };
+
+            this.restart = function (name) {
+                if (!polls[name]) {
+                    return $q.reject('no poll found');
+                }
+
+                var method = polls[name].method;
+                var interval = polls[name].interval;
+
+                this.clear(name);
+
+                return this.start(name, method, interval);
+            };
+
+        }
+    ]);
+// http wrapper that allows a platform to define a base api path for services
+angular
+    .module('realize-lib.core.services.rlz-http', [])
+    .provider('rlzHttp', function () {
+        'use strict';
+
+        var apiPrefix = ''
+        prefixIsSet = false;
+
+        // this can only be configured once, to prevent accidental overrides
+        this.setApiPrefix = function (prefix) {
+            if (prefixIsSet) {
+                throw new Error('rlzHttp error defining apiPrefix: ' + prefix + ' apiPrefix already defined! ' + apiPrefix);
+            }
+
+            if (!angular.isString(prefix)) {
+                throw new Error('rlzHttp invalid apiPrefix!');
+            }
+
+            apiPrefix = prefix;
+            prefixIsSet = true;
+        };
+
+        this.$get = [
+            '$http',
+            function ($http) {
+                var wrapper = function (config) {
+                    if (config.url) {
+                        config.url = apiPrefix + config.url;
+                    }
+
+                    return $http(config);
+                };
+
+                var methods = ['get', 'head', 'post', 'put', 'delete', 'jsonp', 'patch'],
+                    i = 0,
+                    curry = function (method) {
+                        wrapper[method] = function (url) {
+                            var args = Array.prototype.slice.call(arguments, 1);
+
+                            url = apiPrefix + url;
+
+                            args.unshift(url);
+
+                            return $http[method].apply(this, args);
+                        };
+                    };
+
+                for (i = 0; i < methods.length; i++) {
+                    curry(methods[i]);
+                }
+
+                return wrapper;
+            }
+        ];
+    });
+
+angular.module('realize-lib.core.services.session-timeout', [])
+    .config(['$httpProvider',
+        function ($httpProvider) {
+            'use strict';
+
+            var interceptor = ['$rootScope', '$q',
+                function ($rootScope, $q) {
+                    return {
+                        response: function (response) {
+                            return response;
+                        },
+                        responseError: function (response) {
+                            switch (response.status) {
+                            case 401:
+                                $rootScope.$broadcast('httpSessionTimedOut');
+                                return $q.defer().promise;
+
+                            default:
+                                return $q.reject(response);
+                            }
+                        }
+                    };
+                }
+            ];
+
+            $httpProvider.interceptors.push(interceptor);
+        }
+    ]);
+angular.module('realize-lib.localization.localize-filter', [
+    'realize-lib.localization.messages-service'
+])
+    .filter('rlzLocalize', [
+        'rlzMessages',
+        function (rlzMessages) {
+            'use strict';
+
+            /**
+             * @filter localize
+             * Return a message string from a localized messages file.
+             * An optional array of values can be passed to interpolate the values into the string.
+             * Example, no interpolation: {{ 'my.localized.string.name' | localize }}
+             * Example, with interpolation: {{ 'my.localized.interpolated.string.name' | localize: ['x'] }}
+             * Example message string to be interpolated: 'Rob has [0] cats and [1] goats.'
+             * @param input {String} - name of message string
+             * @param interpolatedValues {Array} - optional. An array of values to be interpolated in the message string.
+             */
+            return function (input, interpolatedValues) {
+                var msg;
+
+                if(!input){
+                    return '';
+                }
+
+                if(!angular.isString(input)){
+                    throw new TypeError('Unexpected argument type.');
+                }
+
+                if (angular.isArray(interpolatedValues) && interpolatedValues.length > 0) {
+                    msg = rlzMessages.getInterpolatedMessage(input, interpolatedValues);
+                } else {
+                    msg = rlzMessages.getMessage(input);
+                }
+
+                return msg;
+            };
+        }
+    ]);
+
+angular.module('realize-lib.localization.messages-service', [
+    'realize-lib.core.filters.to-array'
+])
+    .run([
+        'rlzMessages',
+        '$log',
+        function (rlzMessages, $log) {
+            'use strict';
+
+            if (rlzMessages.autoLoad) {
+                $log.debug('Messages auto-load');
+
+                // first chance we get, load up the messages
+                rlzMessages.load();
+            }
+        }
+    ])
+    .provider('rlzMessages', [
+
+        function () {
+            'use strict';
+
+            var MessagesProvider = this,
+                languageFiles = [],
+                provided = {},
+                autoLoad = true,
+                currentLocale = 'en';
+
+            // add a language file to be preloaded
+            MessagesProvider.addLanguageFile = function (langFile) {
+                if (languageFiles.indexOf(langFile) >= 0) {
+                    throw new Error('[MessagesProvider] Duplicate language file: ' + langFile);
+                }
+
+                languageFiles.push(langFile);
+            };
+
+            // toggle autoLoad (true by default)
+            MessagesProvider.setAutoLoad = function (val) {
+                autoLoad = !!val;
+            };
+
+            // add raw json object to the pre-load
+            MessagesProvider.addCache = function (path, codes) {
+                provided[path] = codes;
+            };
+
+            // configure the default locale during loads
+            MessagesProvider.setCurrentLocale = function (locale) {
+                // TODO: setup valid locale list to help prevent errors?
+                currentLocale = locale;
+            };
+
+            MessagesProvider.$get = [
+                '$http',
+                '$log',
+                '$q',
+                '$filter',
+                '$cacheFactory',
+                function ($http, $log, $q, $filter, $cacheFactory) {
+                    var svc = this,
+                        cache = $cacheFactory('MessagesProviderCache');
+
+                    svc.autoLoad = autoLoad;
+
+                    // load the provided json objects into cache
+                    angular.forEach(provided, function (val, key) {
+                        cache.put(key, val);
+                    });
+
+                    // allow configuration during runtime as well (for settings switch)
+                    svc.setCurrentLocale = MessagesProvider.setCurrentLocale;
+
+                    // handles pre-loading and loading of groups of files
+                    // warning! will set currentLocale to last loaded locale
+                    svc.load = function (locale, files) {
+                        var promises = [$q.when(1)];
+
+                        // add in any last minute files
+                        if (angular.isArray(files)) {
+                            angular.forEach(files, function (f) {
+                                MessagesProvider.addLanguageFile(f);
+                            });
+                        } else if (angular.isString(files)) {
+                            MessagesProvider.addLanguageFile(files);
+                        }
+
+                        locale = locale || currentLocale || 'en';
+                        svc.setCurrentLocale(locale);
+
+                        angular.forEach(languageFiles, function (langFile) {
+                            var file = langFile + '_' + locale + '.json';
+
+                            $log.debug('[MessagesProvider] loading file: ', file);
+
+                            var promise = $http.get(file, {
+                                    cache: true
+                                })
+                                .then(function (response) {
+                                    cache.put(file, response.data);
+
+                                    return response.data;
+                                }, function (response) {
+                                    return $q.reject(response);
+                                });
+
+                            promises.push(promise);
+                        });
+
+                        return $q.all(promises);
+                        // TODO: it may be possible that the needed messages do not load in time for a render
+                        // in that case perhaps add $rootScope.apply() here? (chained promise)
+                        // OR host app could instead add the load method to a resolver? angular needs a global resolve.
+                    };
+
+                    // gets a message from the json obj, using dot notation
+                    // the first key MUST be the file
+                    // '/my/path/classes.header.title' === /my/path/classes_xx.json {header: {title: 'Foo'}}
+                    svc.getMessage = function (code, getJson) {
+                        var fileLocationAndMessageKeys,
+                            filelocation,
+                            isFilenameFollowedByPipe,
+                            isMessageKeyPresent,
+                            messageKeys,
+                            result,
+                            o;
+
+                        fileLocationAndMessageKeys = code.split('|');
+
+                        isFilenameFollowedByPipe = !!fileLocationAndMessageKeys[0];
+
+                        if(!isFilenameFollowedByPipe){
+                            throw Error('Filelocation must be specified in message code followed by pipe (|)');
+                        }
+
+                        if(fileLocationAndMessageKeys.length > 2){
+                            throw Error('More than 1 pipe is specified in message code (|)');
+                        }
+
+                        filelocation = fileLocationAndMessageKeys[0] + '_' + currentLocale + '.json';
+
+                        isMessageKeyPresent = !!fileLocationAndMessageKeys[1]
+
+                        if(!isMessageKeyPresent){
+                            $log.warn('Messages keys should be specfied in code delimited by dot (.)');
+                        }
+
+                        messageKeys = fileLocationAndMessageKeys[1].split('.');
+
+                        result = cache.get(filelocation);
+
+                        //$log.debug('getMessage cached value for ', file, ' is: ', result);
+
+                        // file MUST be preloaded (filters can't use promises)
+                        if (!result) {
+                            $log.warn(filelocation + ' was not loaded!');
+                            return null;
+                        }
+
+                        for (o = 0; o < messageKeys.length; o++) {
+                            if (result[messageKeys[o]]) {
+                                result = result[messageKeys[o]];
+                            } else {
+                                result = null;
+                                break;
+                            }
+                        }
+
+                        if (result === null) {
+                            $log.warn(code, ' produced null result!');
+                        }
+
+                        if (getJson) {
+                            return result;
+                        }
+
+                        // we don't want to allow the actual object chunk returned here...
+                        // so an incomplete code will result in null here, only strings!
+                        return angular.isString(result) ? result : null;
+                    };
+
+
+                    /**
+                     * @method getInterpolatedMessage
+                     * @param code {String}
+                     * @param values {Array}
+                     * @returns {String}
+                     */
+                    svc.getInterpolatedMessage = function (code, values) {
+                        var msg = svc.getMessage(code),
+                            v;
+
+                        if (msg === null) {
+                            msg = '';
+                        }
+
+                        for (v = 0; v < values.length; v += 1) {
+                            msg = msg.replace('{' + v + '}', values[v]);
+                        }
+
+                        return msg;
+                    };
+
+                    svc.getMessageOrDefault = function (code, defaultValue) {
+                        var msg = svc.getMessage(code);
+                        return msg === null ? defaultValue : msg;
+                    };
+
+                    svc.getMessagesAsArray = function (code) {
+                        var json = svc.getMessage(code, true);
+                        return $filter('rlzToArray')(json);
+                    };
+
+                    return svc;
+                }
+            ];
+
+        }
+    ]);
+angular.module('realize-lib.core.filters.to-array', [])
+    .filter('rlzToArray', [
+        function () {
+            'use strict';
+
+            function toArray(input) {
+                if (!input) {
+                    return;
+                }
+
+                if (angular.isArray(input)) {
+                    return input;
+                }
+
+                if (angular.isObject(input)) {
+                    return Object.keys(input).map(function (key) {
+                        var element = input[key];
+
+                        return element;
+                    });
+                }
+
+                throw new TypeError('Unexpected argument type');
+            }
+
+            return toArray;
+        }
+    ]);
+
+angular.module('realize-lib.core.services.browser-info', [])
+    .service('BrowserInfo', [
+        '$window',
+        function ($window) {
+            'use strict';
+
+            var userAgent = $window.navigator ? angular.lowercase($window.navigator.userAgent) : '';
+
+            this.browser = {};
+            this.OS = {};
+
+            // regex patterns taken from https://github.com/ded/bowser/blob/master/bowser.js
+            this.browser.isFirefox = /firefox|iceweasel/i.test(userAgent);
+            this.browser.isMSIE = /msie|trident/i.test(userAgent);
+            this.browser.isChrome = /chrome|crios|crmo/i.test(userAgent);
+
+            this.OS.isIOS = /(ipod|iphone|ipad)/i.test(userAgent);
+            this.OS.isIOS5 = this.OS.isIOS && /OS 5_[0-9_]+ like Mac OS X/i.test(userAgent);
+
+            this.OS.isIDevice = (
+                $window.navigator.platform === 'iPad' ||
+                $window.navigator.platform === 'iPhone' ||
+                $window.navigator.platform === 'iPad Simulator' ||
+                $window.navigator.platform === 'iPhone Simulator'
+            );
+
+            this.isRetina = $window.devicePixelRatio >= 2;
+        }
+    ]);
+
+angular.module("realize-lib.templates", []).run(["$templateCache", function($templateCache) {$templateCache.put("/templates/realize-lib/content/audio-player/audio-player.html","<div class=\"container audio\">\n    <div class=\"details clearfix\">\n        <span class=\"a11yOffScreen\">{{ content.$getMediaType() }}</span>\n        <img class=\"thumbnail\" ng-src=\"{{ content.$getThumbnailUrl() }}\" alt=\"{{ content.$getMediaType() }}\" />\n        <ul>\n            <li class=\"content-details-title\">\n                <strong>{{ \"rlz-audio-player.label.title\" | localize }}:</strong>&nbsp;\n                <span ng-show=\"content.$isDownloadable()\">\n                    <a href=\"javascript://\" ng-click=\"download($event)\">{{ content.$getTitle() }}</a>\n                </span>\n                <span ng-hide=\"content.$isDownloadable()\">\n                    {{ content.$getTitle() }}\n                </span>\n            </li>\n\n            <li class=\"content-details-filename\">\n                <strong>{{ \"rlz-audio-player.label.fileName\" | localize }}:</strong>&nbsp;\n                <span ng-show=\"isDownloadable()\">\n                    <a href=\"javascript://\" ng-click=\"download($event)\">{{ content.$getFileName() }}</a>\n                </span>\n                <span ng-hide=\"isDownloadable()\">\n                    {{ content.$getFileName() }}\n                </span>\n            </li>\n\n            <li class=\"content-details-size\">\n                <strong>{{ \"rlz-audio-player.label.size\" | localize }}:</strong>&nbsp;{{ content.$getFileSize() | fileSize }}</li>\n\n            <li class=\"content-details-audio\" ng-show=\"content.$isPlayableAudio()\">\n                <rlz-media-player media-type=\"audio\" src=\"{{ content.$getPlaybackUrl() }}\" encoding=\"{{ content.$getPlaybackEncoding() }}\"></rlz-media-player>\n            </li>\n        </ul>\n    </div>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/content-viewer/content-viewer.html","<div class=\"content-viewer\">\n\n    <div class=\"content-body {{ content.$getMediaType() | snake }} {{ content.$getFileType() | snake }}\">\n\n        <rlz-download-only ng-if=\"content.$isDownloadOnly()\" content=\"content\"></rlz-download-only>\n\n        <div ng-if=\"!content.$isDownloadOnly()\">\n\n            <rlz-image-player ng-if=\"content.$isImage()\" src-url=\"{{ content.$getPlaybackUrl() }}\" alt-text=\"{{ content.$getDescription() }}\"></rlz-image-player>\n\n            <rlz-video-player ng-if=\"content.$isVideo()\" content=\"content\"></rlz-video-player>\n\n            <rlz-audio-player ng-if=\"content.$isAudio()\" content=\"content\"></rlz-audio-player>\n\n            <rlz-swf-player ng-if=\"content.$isSwf()\" src-url=\"{{ content.$getPlaybackUrl() }}\" swf-options=\"swfOptions\"></rlz-swf-player>\n\n            <rlz-link-player ng-if=\"content.$isExternalLink()\" launch-url=\"{{ content.$getPlaybackUrl() }}\" alt-text=\"{{ content.$getDescription() }}\" thumbnail-url=\"{{ content.$getThumbnailUrl() }}\" preview-url=\"{{ content.$getPreviewUrl() }}\"></rlz-link-player>\n\n            <rlz-pdf-player ng-if=\"content.$isPdf()\" src-url=\"{{ content.$getPlaybackUrl() }}\"></rlz-pdf-player>\n\n            <rlz-doc-player ng-if=\"content.$isDocument()\" ng-init=\"previewPages = content.$getPreviews();\" pages=\"previewPages\"></rlz-doc-player>\n\n            <rlz-external-player ng-if=\"content.$isExternalSource()\" src-url=\"{{ content.$getPlaybackUrl() }}\" width=\"{{ content.$getPlaybackWidth() }}\" height=\"{{ content.$getPlaybackHeight() }}\"></rlz-external-player>\n\n            <!-- custom player for platform integrators to support other types -->\n            <rlz-custom-player ng-if=\"content.$requiresCustomPlayer()\" content=\"content\" configuration=\"configuration\"></rlz-custom-player>\n\n        </div>\n\n    </div>\n\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/custom-player/custom-player.html","<div>Custom Player - End User Should Never See This!</div>");
+$templateCache.put("/templates/realize-lib/content/doc-player/doc-player.html","<div class=\"doc-player\" ng-switch=\"pages.length\" tabindex=\"0\">\n    <div ng-switch-when=\"0\">{{ \"rlz-doc-player.zeroState\" | localize }}</div>\n    <div ng-switch-default>\n        <div class=\"doc-player-page\" ng-repeat=\"page in pages\">\n            <img alt=\"{{ \'rlz-doc-player.altText\' | localize }}\" data-page=\"{{ $index + 1 }}\" ng-src=\"{{ page }}\" />\n        </div>\n    </div>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/download-only/download-only.html","<div class=\"container download-only extension-{{ content.$getFileType() | snake }} {{ content.$getMediaType() | lowercase | snake }}\">\n    <div class=\"details clearfix\">\n        <span class=\"a11yOffScreen\">{{ content.$getMediaType() }}</span>\n        <img class=\"thumbnail\" ng-src=\"{{ content.$getThumbnailUrl() }}\" alt=\"{{ content.$getMediaType() }}\" />\n        <ul>\n            <li class=\"content-details-title\">\n                <strong>{{ \"rlz-download-only.title\" | localize }}:</strong>&nbsp;<a href=\"javascript://\" ng-click=\"download($event)\">{{ content.$getTitle() }}</a>\n            </li>\n            <li class=\"content-details-filename\">\n                <strong>{{ \"rlz-download-only.fileName\" | localize }}:</strong>&nbsp;<a href=\"javascript://\" ng-click=\"download($event)\">{{ content.$getFileUrl() }}</a>\n            </li>\n            <li class=\"content-details-size\">\n                <strong>{{ \"rlz-download-only.size\" | localize }}:</strong>&nbsp;{{ content.$getFileSize() | fileSize }}\n            </li>\n        </ul>\n    </div>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/external-player/external-player.html","<iframe ng-src=\"{{ srcUrl }}\" width=\"{{ width }}\" height=\"{{ height }}\" frameborder=\"0\"></iframe>");
+$templateCache.put("/templates/realize-lib/content/image-player/image-player.html","<img ng-src=\"{{ srcUrl }}\" alt=\"{{ altText }}\" />");
+$templateCache.put("/templates/realize-lib/content/link-player/link-player.html","<div class=\"link-player container new-window has-image\">\n    <img class=\"link-player-preview-image\" style=\"visibility:hidden;\" ng-src=\"{{ previewUrl }}\" alt=\"{{ altText }}\" />\n    <a class=\"details\" ng-href=\"{{ launchUrl }}\" target=\"_blank\">\n        <div class=\"button-wrapper\">\n            <div class=\"click-thumbnail\" ng-class=\"{\'no-src\': !hasThumbnail()}\">\n                <img ng-if=\"hasThumbnail()\" ng-src=\"{{ thumbnailUrl }}\" alt=\"{{ altText }}\" />\n            </div>\n            <div class=\"click-text\">{{ \"rlz-link-player.launchLinkText\" | localize }}</div>\n            <div class=\"click-button\"><i class=\"fa fa-arrow-right\" /></div>\n        </div>\n    </a>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/media-player/media-player.html","<div>\n    <audio ng-if=\"mediaType === \'audio\'\" ng-src=\"{{ srcAudio }}\" type=\"{{ encoding }}\" controls=\"controls\"></audio>\n    <video ng-if=\"mediaType === \'video\'\" ng-src=\"{{ srcVideo }}\" type=\"{{ encoding }}\" controls=\"controls\"></video>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/pdf-player/pdf-player.html","<div class=\"pdf-player\">\n    <div class=\"pdfViewer\"><div class=\"page\"><div class=\"loadingIcon\" /></div></div>\n</div>\n");
+$templateCache.put("/templates/realize-lib/content/swf-player/swf-player.html","<div>\n    <div ng-show=\"flashSupported\">\n        <div id=\"flash-content\">\n            <div id=\"SWF_container_small\"></div>\n        </div>\n    </div>\n    <div ng-hide=\"flashSupported\">\n        <div class=\"device-error-message\">{{ \"rlz-swf-player.unsupportedFlash\" | localize }}</div>\n    </div>\n</div>");
+$templateCache.put("/templates/realize-lib/content/video-player/video-player.html","<rlz-media-player media-type=\"video\" src=\"{{ content.$getPlaybackUrl() }}\" encoding=\"{{ content.$getPlaybackEncoding() }}\"></rlz-media-player>\n");}]);

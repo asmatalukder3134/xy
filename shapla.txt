@@ -1,0 +1,46 @@
+
+Zaki muzahid
+Tell me about yourself version 2
+==========================
+Change it as per your skills.
+
+   i have been working as a qa engineer since 5+ years.
+Throughout my career I worked as a manual and automation tester for web based and mobile
+based application where I mostly performed front end and back end testing
+To do that I mostly worked in Agile methodology in both scrum and Kanban project
+As a tester my main responsibility is to find the bug and raise into bug tracking tools like jira and
+rally
+    As a tester I analyzed acceptance criteria, business requirements, test strategies, test plans and
+wrote test cases into test rail and excel sheet and execute them manually and using automation
+tool like selenium web driver api in different server/environment like qa, prepod and production
+As a QA i’ve experience writing different kind of documentation and attend different agile
+meeting with on shore and off shore team
+As a automation engineer i mostly used selenium web driver api for funtional/ui testing for web
+based applications
+to enhance my selenium scripts i used oop concept like java
+even though i have good knowledge in python in c# but i never got chance to implement using
+selenium
+in my career i have chance to work in different framework like hybrid data driven, add cucumber
+etc where i mostly used maven as a project building tool
+to maintain my test cases i used testng as a testing framework
+to share our project within team members i get chance to work in different version control tool
+like git and bigbucket
+to run our regression suite nightly bases we trigger our project into jenkins
+sometimes i performed parallel and crossbrowing testing using selenium grid and sauce lab
+for reporting purpose i used log4j, ireporter extend report and customized html report
+so i have a good exposure in bed cucumber framework where i mostly write feature file using
+gherkin syntax and implement them using page object model concept through step definition
+class
+even though i m expert for ui testing but i have a hands on experience for back end testing as
+well
+to validate my data base i wrote some simple and complex queries using mysql and oracle
+so i have sound knowledge in api testing like rest and soap using postman and soapui tools
+manually
+beside that i execute rest api using automation tool like jackson and rest assured framework
+on the other hand i get chance to work in mobile application using automation tool like appium
+for web and native app
+so even though i have experience for web and hybrid app i execute mobile scripts using real
+devices and simulator and emulator for both platform iOS and android
+beside all of my automation experience i have a sound knowledge about web fundamentals
+concepts like html, css, javascript, ajax, angular js etc
+in short thats all about myself, if u have any further question i’ll be happy to elaborate more

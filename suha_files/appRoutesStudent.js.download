@@ -1,0 +1,387 @@
+angular.module('RealizeApp')
+    .config([
+        '$routeProvider',
+        '$locationProvider',
+         function($routeProvider, $locationProvider) {
+            'use strict';
+
+            $locationProvider.html5Mode(true);
+
+            // temp until proper routes are defined...
+            var defaultPath = '/home',
+                TEMPLATE_CACHE = 'templates';
+
+            var ContentViewerConfig = {
+                    controller: 'ContentCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/views/contentViewer.html',
+                    resolve: {
+                        ContentViewerData: ['ContentResolver', 'Resolve',
+                            'assignmentViewerService', 'featureManagementService',
+                            function(ContentResolver, Resolve, assignmentViewerService, featureManagementService) {
+                                return ContentResolver()
+                                    .then(function(contentViewerData) {
+                                        if (assignmentViewerService.isAssignmentViewer()) {
+                                            return Resolve.SingleLWCAssignment()
+                                                .then(function(lwcAssignment) {
+                                                    contentViewerData.assignment = lwcAssignment;
+                                                    return Resolve.ClassRoster().then(function(classRoster) {
+                                                        contentViewerData.ClassRoster = classRoster;
+                                                        contentViewerData.isGoogleClassroomEnabled =
+                                                            featureManagementService.isGoogleClassroomEnabled();
+                                                        return contentViewerData;
+                                                    });
+
+                                                });
+                                        }
+                                        return contentViewerData;
+                                    });
+                            }
+                        ]
+                    }
+                },
+                LessonConfig = {
+                    controller: 'LessonCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/views/lesson.html',
+                    resolve: {
+                        LessonContent: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.Lesson();
+                            }
+                        ]
+                    }
+                };
+
+            $routeProvider
+                .when('/welcome', {
+                    controller: 'StudentProfileCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/views/student_profile.html',
+                    reloadOnSearch: false
+                })
+                .when('/profile', {
+                    controller: 'StudentProfileCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/views/studentSettings.html'
+                })
+                .when('/home', {
+                    controller: 'StudentHomeCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/app/home/student/studentHome.ctrl.html'
+                })
+                .when('/search', {
+                    controller: 'KeywordSearchCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/search/keywordSearch/keywordSearch.ctrl.html'
+                })
+                .when('/classes', {
+                    controller: 'StudentClassesCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/classLanding/studentClasses/studentClasses.html',
+                    resolve: {
+                        CountClasses: ['$location', '$q', 'ClassRoster',
+                            function($location, $q, ClassRoster) {
+                                var deferred = $q.defer();
+                                ClassRoster.get({
+                                    studentId: true
+                                }).then(function(rosters) {
+                                    if (rosters.length < 2) {
+                                        //Skip class list if only 1 class
+                                        var redirectTo = ['classes', rosters[0].classId, 'assignments'].join('/');
+
+                                        deferred.reject({
+                                            type: 'redirect',
+                                            path: redirectTo
+                                        });
+                                    } else {
+                                        deferred.resolve();
+                                    }
+                                });
+                                return deferred.promise;
+                            }
+                        ],
+                        RosterData: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.StudentClasses();
+                            }
+                        ]
+                    }
+                })
+                .when('/classes/:classId/assignments', {
+                    controller: 'StudentAssignmentLevelOneCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/assignment/student/levelOne.html',
+                    resolve: {
+                        CountClasses: ['ClassRoster',
+                            function(ClassRoster) {
+                                return ClassRoster.get({
+                                    studentId: true
+                                }).then(function(rosters) {
+                                    return rosters.length;
+                                });
+                            }
+                        ],
+                        RosterData: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.ClassRoster();
+                            }
+                        ],
+                        AssignmentData: ['Resolve', 'ASSIGNMENT_CONSTANTS',
+                            function(Resolve, assignmentConstants) {
+                                return Resolve.StudentAssignmentsByStatus(assignmentConstants.STATUS.NOT_STARTED);
+                            }
+                        ]
+                    },
+                    reloadOnSearch: false
+                })
+                .when('/classes/:classId/assignments/:assignmentId', {
+                    controller: 'AssignmentLandingCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/assignment/common/landing.html',
+                    resolve: {
+                        RosterData: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.ClassRoster();
+                            }
+                        ],
+                        resolveAssignmentData: ['Resolve', '$q', 'OptionalFeatures', 'commentsApiService',
+                            'ASSIGNMENT_CONSTANTS', '$currentUser', '$log', 'DiscussRestAPIEndpoints', '$route',
+                            'standardModal', '$location', 'lwcI18nFilter',
+                            function(Resolve, $q, OptionalFeatures, commentsApiService,
+                                     ASSIGNMENT_CONSTANTS, $currentUser, $log, DiscussRestAPIEndpoints, $route,
+                                     standardModal, $location, lwcI18nFilter) {
+                                return Resolve.SingleLWCAssignment()
+                                    .then(function(data) {
+                                        if (data.status === ASSIGNMENT_CONSTANTS.INACTIVE ||
+                                            new Date() < new Date(data.startDate)) {
+                                            var okButton = {
+                                                label: lwcI18nFilter('assignmentPreview.invalidAssignment.buttons.OK'),
+                                                // jscs:disable maximumLineLength
+                                                ariaLabel: lwcI18nFilter('assignmentPreview.invalidAssignment.buttons.OK'),
+                                                action: function() {
+                                                    standardModal.deactivate();
+                                                    $location.path('/classes');
+                                                },
+                                                className: [],
+                                                disabled: false,
+                                            };
+
+                                            standardModal.activate({
+                                                heading: lwcI18nFilter('assignmentPreview.invalidAssignment.title'),
+                                                description: lwcI18nFilter('assignmentPreview.invalidAssignment.message'),
+                                                buttons: [okButton],
+                                                closeButton: true,
+                                                overlayActive: true,
+                                                cssClass: 'customized-items-popup',
+                                                closeAction: function() {
+                                                    standardModal.deactivate();
+                                                    $location.path('/classes');
+                                                }
+                                            });
+                                        }
+
+                                        var isCompleted = data.studentsCompleted > 0,
+                                            RRSActivityPromises = isCompleted ? data.getRRSActivities(true) : [],
+                                            itemData = data.$findItemMetadata(data.itemUuid, $currentUser.userId) || {},
+                                            discussionPostsPromise;
+                                        data.externalId = itemData.userAssignmentId;
+
+                                        // get post count only for discussion prompts
+                                        if (data.isAssignmentPastDueDate() && (
+                                                 data.isSingleDiscussion() ||
+                                                 data.isLessonWithDisucssionAssignment())) {
+                                            var externalIds = [],
+                                                classId = $route.current.params.classId,
+                                                assignmentId = $route.current.params.assignmentId;
+
+                                            externalIds.push('class:' + classId);
+                                            externalIds.push('prompt');
+                                            externalIds.push('assign:' + assignmentId);
+                                            discussionPostsPromise =
+                                                DiscussRestAPIEndpoints.getPostsNumberFromDiscussion(externalIds)
+                                            .then(function(response) {
+                                                data.discussionPostsSummaries = response.data.data.childSummary;
+                                                return data;
+                                            })
+                                            .catch(function() {
+                                                data.discussionPostsSummaries = [];
+                                            });
+
+                                        } else {
+                                            discussionPostsPromise = {};
+                                        }
+
+                                        return $q.all([RRSActivityPromises, discussionPostsPromise])
+                                            .then(function() {
+                                                return data;
+                                            });
+                                    });
+                            }
+                        ]
+                    }
+                })
+                .when('/grades', {
+                    controller: 'GradesHomeCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/reporting/grades/gradesHome.html',
+                    resolve: {
+                        CountClasses: ['$location', '$q', 'ClassRoster',
+                            function($location, $q, ClassRoster) {
+                                var deferred = $q.defer();
+                                ClassRoster.get({
+                                    studentId: true
+                                }).then(function(rosters) {
+                                    if (rosters.length < 2) {
+                                        deferred.reject({
+                                            type: 'redirect',
+                                            path: ['grades', rosters[0].classId, 'overview'].join('/')
+                                        });
+                                    } else {
+                                        deferred.resolve();
+                                    }
+                                });
+                                return deferred.promise;
+                            }
+                        ],
+                        RosterData: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.StudentClasses();
+                            }
+                        ]
+                    }
+                })
+                .when('/grades/:classId/overview', {
+                    controller: 'GradesOverviewCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/reporting/grades/gradesOverview.html',
+                    resolve: {
+                        RosterData: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.ClassRoster();
+                            }
+                        ],
+                        CountClasses: ['ClassRoster',
+                            function(ClassRoster) {
+                                return ClassRoster.get({
+                                    studentId: true
+                                }).then(function(rosters) {
+                                    return rosters.length;
+                                });
+                            }
+                        ]
+                    }
+                })
+                .when('/grades/:classId/overview/assignments/status/:status/:filterStartDate/:filterEndDate', {
+                    controller: 'StudentProgressRecapCtrl',
+                    templateUrl: TEMPLATE_CACHE + '/reporting/grades/progressRecap.student.html',
+                    resolve: {
+                        ProgressRecap: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.StudentProgressRecap();
+                            }
+                        ]
+                    }
+                })
+                .when('/grades/:classId/overview/assignment/:assignmentId/assessments/' +
+                    ':sessionId/:filterStartDate/:filterEndDate/:assignmentIndex', {
+                        controller: 'StudentItemAnalysisCtrl',
+                        templateUrl: TEMPLATE_CACHE + '/reporting/grades/itemAnalysis.student.html',
+                        resolve: {
+                            ItemAnalysis: ['Resolve',
+                                function(Resolve) {
+                                    return Resolve.StudentItemAnalysis();
+                                }
+                            ],
+                            Summary: ['AssessmentPlayerService', '$route',
+                                function(AssessmentPlayerService, $route) {
+                                    return AssessmentPlayerService
+                                        .getScoreSummaryAndSkills($route.current.params.sessionId);
+                                }
+                            ],
+                            UserAssignmentData: ['AssessmentPlayerService', '$route',
+                                function(AssessmentPlayerService, $route) {
+                                    return AssessmentPlayerService
+                                        .getUserAssignmentData($route.current.params.sessionId);
+                                }
+                            ],
+                            RosterData: ['Resolve',
+                                function(Resolve) {
+                                    return Resolve.ClassRoster();
+                                }
+                            ]
+                        }
+                    })
+                .when('/program', {
+                    controller: 'ProgramListController',
+                    template: '<div programs-landing></div>',
+                    resolve: {
+                        ProgramsListInfo: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.ProgramListInfo();
+                            }
+                        ]
+                    }
+                })
+                .when('/program/:programId/:programVersion', {
+                    controller: 'ProgramCtrl',
+                    template: '<div program-view></div>',
+                    resolve: {
+                        RootTierContent: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.Program();
+                            }
+                        ]
+                    }
+                })
+                .when('/program/:programId/:programVersion/tier/:itemId/:itemVersion', {
+                    controller: 'TierCtrl',
+                    template: '<div program-view></div>',
+                    resolve: {
+                        TierContent: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.Tier();
+                            }
+                        ]
+                    }
+                })
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/tier2/:itemId/:itemVersion', {
+                    controller: 'TierCtrl',
+                    template: '<div program-view></div>',
+                    resolve: {
+                        TierContent: ['Resolve',
+                            function(Resolve) {
+                                return Resolve.Tier();
+                            }
+                        ]
+                    }
+                })
+                .when('/search/lesson/:lessonId/:lessonVersion', LessonConfig)
+                .when('/classes/:classId/assignments/:assignmentId/lesson/:itemId/:itemVersion', LessonConfig)
+                .when('/program/:programId/:programVersion/lesson/:itemId/:itemVersion', LessonConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/lesson/:itemId/:itemVersion',
+                    LessonConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/tier2/:tier2Id/' +
+                    ':tier2Version/lesson/:itemId/:itemVersion', LessonConfig)
+                .when('/program/:programId/:programVersion/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/program/:programId/:programVersion/lesson/:lessonId/:lessonVersion/content/' +
+                    ':itemId/:itemVersion', ContentViewerConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/lesson/' +
+                    ':lessonId/:lessonVersion/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/tier2/:tier2Id/' +
+                    ':tier2Version/lesson/:lessonId/:lessonVersion/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/program/:programId/:programVersion/tier/:tierId/:tierVersion/tier2/:tier2Id/' +
+                    ':tier2Version/content/:itemId/:itemVersion', ContentViewerConfig)
+                .when('/search/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/search/lesson/:lessonId/:lessonVersion/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/classes/:classId/assignments/:assignmentId/content/:itemId/:itemVersion',
+                    ContentViewerConfig)
+                .when('/classes/:classId/assignments/:assignmentId/content/:itemId/:itemVersion/' +
+                    'assignmentUserId/:assignmentUserId', ContentViewerConfig)
+                .when('/classes/:classId/assignments/:assignmentId/content/:itemId/:itemVersion/' +
+                    'assignmentUserId/:assignmentUserId/:isReviewMode', ContentViewerConfig)
+                .when('/content/:itemId/:itemVersion', ContentViewerConfig)
+                .when('/ltia/classes/:classId/assignments/:assignmentId/content/:itemId/:itemVersion/' +
+                    'assignmentUserId/:assignmentUserId', ContentViewerConfig)
+                .when('/ltia/content/:itemId/:itemVersion', ContentViewerConfig)
+                .otherwise({
+                    redirectTo: defaultPath
+                });
+        }
+    ]);

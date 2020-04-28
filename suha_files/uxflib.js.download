@@ -1,0 +1,3301 @@
+/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * moduleloader.js
+ */
+
+/*global jQuery, _, UXF: true, window, setTimeout, shift */
+
+var UXF = UXF || {};
+
+/**
+ * UXF module loader.   This must be loaded before any other UXF classes.  It
+ * just makes it possibly to break components up into smaller modules and then
+ * ensure that they are loading in the correct order.  If we ever switch to
+ * something like requirejs or commonjs this should go away.
+ */
+UXF.Module = (function($, _) {
+    "use strict";
+
+
+    var loadDependencies,
+        Module = {
+        loader: {}
+    };
+
+
+    loadDependencies = function(deps, moduleName) {
+        var ret = [], checkOnly = false;
+
+        if (!deps) {
+            return [];
+        }
+
+        _.each(deps, function(dep) {
+            var parent = window,
+                parts;
+
+            if (!dep) {
+                return;
+            }
+
+            if (!_.isString(dep)) {
+                // push raw objects into the args array without lookups
+                ret.push(dep);
+
+            } else if (dep === 'window') {
+                // special case... avoid trying to find window.window...
+                ret.push(window);
+
+            } else {
+                parts = dep.split('.');
+                _.each(parts, function(part) {
+                    if (Object.prototype.hasOwnProperty.call(parent,part)) {
+                        parent = parent[part];
+                    } else {
+                        throw new Error('Required dependency "' + dep + '" not found for module "' + moduleName + '"');
+                    }
+                });
+
+                // at this point, parent points to the actual dependency...
+                ret.push(parent);
+            }
+
+        });
+
+        return ret;
+    };
+
+
+    Module.define = function() {
+        var args, arg1, module = {};
+
+        args = Array.prototype.slice.call(arguments);
+        arg1 = args.shift();
+
+        if (_.isString(arg1)) {
+            module = {
+                name: arg1,
+                initFunc: args.shift()
+            };
+        } else {
+            module = arg1;
+        }
+
+        if (!module.name || !module.initFunc) {
+            throw new Error('Invalid module definition.  Missing name or initialization function');
+        }
+
+        Module.loader[module.name] = module;
+    };
+
+
+    Module.loadAll = function(names) {
+        _.each(names, function(name) {
+            Module.load(name);
+        });
+    };
+
+
+    Module.load = function(name) {
+        var parts, i, length, root, initFunc, initArgs, moduleName, newModule;
+
+        if (!Module.loader[name]) {
+            throw new Error('Unrecognized module [' + name + ']');
+        }
+
+        root = window;
+        parts = name.split('.');
+        for (i = 0, length = parts.length; i < length - 1; i++) {
+            if (!Object.prototype.hasOwnProperty.call(root,parts[i])) {
+                root[parts[i]] = {};
+            }
+
+            root = root[parts[i]];
+        }
+
+        initFunc = Module.loader[name].initFunc;
+        initArgs = loadDependencies(Module.loader[name].initArgs, name);
+
+        // handle case where you have additional dependencies you don't
+        // necessarily want to pass in to the init function...
+        if (Module.loader[name].dependencies) {
+            loadDependencies(Module.loader[name].dependencies, name);
+        }
+
+        moduleName = parts.pop();
+        newModule = initFunc.apply(this, initArgs);
+        if (root[moduleName]) {
+            // module already exists, merge new props with old props.
+            _.extend(root[moduleName], newModule);
+        } else {
+            root[moduleName] = newModule;
+        }
+
+        // kill this module definition.  Free up memory and avoid duplicate
+        // loading...
+        delete Module.loader[name];
+    };
+
+    return Module;
+} (jQuery, _));
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * abstractview.js
+ */
+
+/*global jQuery, Backbone, _, UXF */
+
+
+/**
+ * Base class for UXF components.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.AbstractView',
+    initArgs: ['jQuery', 'Backbone', '_', 'debug', 'UXF.Common.i18n'],
+    initFunc: function($, Backbone, _, debug, i18n) {
+        "use strict";
+
+        var AbstractView, i18nCallback;
+
+
+        /**
+         * Helper function to get a i18n callback with the correct context (the
+         * template func loses 'this' if you don't handle it carefully.)
+         *
+         *
+         * @param obj
+         * @return the i18nCallback
+         */
+        i18nCallback = function(obj) {
+            return obj.options.i18nCallback || function(key, args, plural) {
+                try {
+                    return i18n.local(key, args, plural);
+                } catch (e) {
+                    return key;
+                }
+            };
+        };
+
+
+        /**
+         * Requires construction with opts.
+         */
+        AbstractView = Backbone.View.extend({
+            classes: {},
+
+
+            constructor: function(parent, opts) {
+                this.parent = parent;
+                Backbone.View.apply(this, [opts]);
+            },
+
+
+            _configure: function() {
+                Backbone.View.prototype._configure.apply(this, arguments);
+
+                this._bindings = [];
+                this._inheriti18n();
+                this._localize();
+                this._compileTemplates();
+                this._mergeClasses();
+            },
+
+
+            /**
+             * Register a binding.   Used "listen" to avoid conflicts with the
+             * built-in 'bind' method.
+             *
+             * @param obj
+             * @param type
+             * @param func
+             * @param context
+             */
+            listen: function(obj, type, func, context) {
+                func = func || function() {};
+
+                if (!context) {
+                    context = this;
+                }
+
+                this._bindings.push({
+                    obj: obj,
+                    type: type,
+                    func: func
+                });
+                obj.bind(type, func, context);
+            },
+
+
+            /**
+             * Unregister a binding.
+             *
+             * @param obj
+             * @param type
+             * @param func
+             */
+            unlisten: function(obj, type, func) {
+                obj.unbind(type, func);
+
+                this._bindings = _.filter(this._bindings, function(binding) {
+                    return !(obj === binding.obj && type === binding.type && func === binding.func);
+                });
+            },
+
+
+            /**
+             * Look up an element by named mapping.  This will look at the
+             * @param key
+             * @return {*}
+             */
+            locate: function(key) {
+                var selector;
+
+                if (!this.selectors || !this.selectors.hasOwnProperty(key)) {
+                    return null;
+                }
+
+                selector = this.selectors[key];
+                if (_.isFunction(selector)) {
+                    return selector.apply(this);
+                } else if (this.classes && this.classes[selector]) {
+                    // if a class label is specified, lookup using the configured classname.
+                    return this.$('.' + this.classes[selector]);
+                } else {
+                    return this.$(selector);
+                }
+            },
+
+
+            _inheriti18n: function() {
+                if (this.options && this.options.i18nCallback) {
+                    return;
+                }
+
+                if (!this.parent || !this.parent.options || !this.parent.options.i18nCallback) {
+                    return;
+                }
+
+                this.options.i18nCallback = this.parent.options.i18nCallback;
+            },
+
+
+            _localize: function() {
+                var self = this, settings;
+
+                // if the localize object already initialized for this instance...
+                if (!this.localize || this.hasOwnProperty('localize')) {
+                    return;
+                }
+
+                // settings bound to the constructor prototype so save it off and the
+                // we'll bind the "compiled" version to this.
+                settings = this.localize;
+
+                // local copy of compiled vals...
+                this.localize = {};
+
+                $.each(settings, function(key, val) {
+                    // allow localization keys to be be overridden in options.
+                    if (self.options.localize && self.options.localize[key]) {
+                        val = self.options.localize[key];
+                    }
+
+                    // if null, don't bother trying to look it up.
+                    if (val) {
+                        var newVal = function(args, plural) {
+                            return self.i18n(val, args, plural);
+                        };
+
+                        self.localize[key] = newVal;
+                    }
+                });
+            },
+
+
+            _compileTemplates: function() {
+                var self = this, settings;
+
+                if (!this.templates || this.hasOwnProperty('templates')) {
+                    return;
+                }
+
+                settings = this.templates;
+
+                $.each(settings, function(key, val) {
+                    var compiledTemplate,
+                        templateFunc,
+                        override = false;
+
+                    // allow templates to be overridden
+                    if (self.options.templates && self.options.templates[key]) {
+                        // _compiledTemplates tracks overridden templates that have been compiled
+                        if (!self._compiledTemplates) {
+                            self._compiledTemplates = {};
+                        }
+
+                        if (!self._compiledTemplates[key]) {
+                            val = self.options.templates[key];
+                            override = true;
+                        }
+                    }
+
+                    // a template that's not a function has not been compiled
+                    if (!_.isFunction(val)) {
+                        compiledTemplate = self._compileTemplate(val);
+
+                        templateFunc = function(args) {
+                            return self.execTemplate(compiledTemplate, args);
+                        };
+
+                        if (override) {
+                            self.templates[key] = templateFunc;
+                            self._compiledTemplates[key] = true;
+                        } else {
+                            self.constructor.prototype.templates[key] = templateFunc;
+                        }
+                    }
+                });
+            },
+
+
+            /**
+             * Merge the default classes in with the classes value in the options.
+             *
+             * @private
+             */
+            _mergeClasses: function() {
+                // merge configured classes in with the defaults...
+                _.extend(this.classes, this.options.classes);
+            },
+
+
+            /**
+             * On destroy handler for framework classes.  This method is intended
+             * to be overridden in framework classes (eg. collectionview).  The
+             * idea is to have a place to stick destruction code, but leave onDestroy
+             * alone so that implementing classes don't need to explicitly call
+             * super.onDestroy every time that method is implemented.
+             *
+             * Framework classes that override onDestroyInternal still must call
+             * super.onDestroyInternal.
+             */
+            onDestroyInternal: function() {
+                this.unbind();
+                this.undelegateEvents();
+
+                // free possible self references in overridden templates that might keep from garbage collecting
+                // this view
+                this.templates = null;
+                this._compiledTemplates = null;
+
+                // kill off all registered bindings...
+                if (this._bindings) {
+                    _.each(this._bindings, function(binding) {
+                        binding.obj.unbind(binding.type, binding.func);
+                    });
+                    this._bindings = null;
+                }
+
+                this.parent = null;
+                this.model = null;
+
+                this.selectors = null;
+                this.localize = null;
+
+                // These are getting caught up in the template caching code
+//                this.classes = null;
+//                this.options = null;
+
+                // TODO: This is causing some failures in a dependent project,
+                // presumably because we are relying on this element after the view
+                // was destroyed.  I will make this change and fix those issues soon.
+                this.setElement(null);
+                this.remove();
+            },
+
+
+            /**
+             * Extend the Backbone.View to add a destroy() method.
+             *
+             * This is borrowed from:
+             * http://lostechies.com/derickbailey/2011/09/15/zombies-run-managing-page-transitions-in-backbone-apps/
+             */
+            destroy: function() {
+                // destroy all children first...
+                if (this.onDestroy) {
+                    try {
+                        this.onDestroy();
+                    } catch (e) {
+                        debug.error('Error destroying widget!', e);
+                    }
+                }
+
+                // then clean up common references...
+                if (this.onDestroyInternal) {
+                    this.onDestroyInternal();
+                }
+            },
+
+
+
+            /**
+             * Custom replacement for underscores template function.  This version supports
+             * a simple <%__ ... %> syntax that can be use for internationalizing strings.
+             * The template accepts up to 3 args:
+             *  - a key (required)
+             *  - an array of arguments for the template (optional)
+             *  - a number (for pluralization)
+             *
+             *  Example:
+             *
+             *  <%__ "key" [ arg1, arg2 ], 3 %>
+             *
+             * Will render the plural version of "key" using arg1 and arg2 as the replacement
+             * values for the first sprintf formatted placeholders in the template.
+             *
+             * @param str the string to internationalize
+             * @return the compiled template
+             */
+            _compileTemplate: function(str) {
+                // add __ template syntax to allow for i18n...
+                var newStr = str.replace(/<%__([\s\S]+?)%>/g, function(match, args) {
+                    return '<% print(i18n(' + args + ')); %>';
+                });
+
+                // add _NN template "tag" to print only existing values (NN = not null)
+                newStr = newStr.replace(/<%_NN([\s\S]+?)%>/g, function(match, args) {
+                    return ['<% if(', args, ' !== null && ', args, ' !== undefined) { print(', args, '); } %>'].join("");
+                });
+
+                return _.template(newStr);
+            },
+
+
+            /**
+             * Method to get to the i18n callback directly rather than using the template.
+             *
+             * @param key
+             * @param args
+             * @param plural
+             * @return {*}
+             */
+            i18n: function(key, args, plural) {
+                var callback = i18nCallback(this);
+                return callback(key, args, plural);
+            },
+
+
+            /**
+             * Actually execute a template.  This version just passes in the appropriate
+             * callback for handling internationalization.
+             *
+             * @param template the compiled template
+             * @param args the list of arguments to pass to the template.
+             * @return the markup generated by the template.
+             */
+            execTemplate: function(template, args) {
+                // Make the custom callback and the classes available to the template.
+                var callback = i18nCallback(this);
+                return template(_.extend({}, args, { classes: this.classes, i18n: callback }));
+            },
+
+
+            getSelectors: function() {
+                return this.selectors || {};
+            }
+
+        });
+
+
+        AbstractView.extend = Backbone.View.extend;
+
+        return AbstractView;
+    }
+});
+;/*
+ * Copyright 2013, Pearson Education, Learning Technology Group
+ *
+ * $('#id').audioplayer( {} );
+ * 
+ * e.g. API usage - $('#id').audioplayer ( 'play')
+ *
+ * audioplayer.js
+ */
+
+UXF.Module.define({
+    name: 'UXF.AudioPlayer.Widget.AudioPlayer',
+    dependencies: ['jQuery.widget'],
+    initArgs: ['jQuery', 'debug', 'flowplayer', 'UXF.Common.BrowserUtils'],
+    initFunc: function($, debug, flowplayer, browserUtils) {
+        "use strict";
+
+        $.widget('ui.audioplayer', {
+            defaults: {
+                // optional during initializing the widget but required when playing the audio clip
+                audioURL: null,
+                // optional
+                audioType: null,
+                // required at the time of initializing the widget for non-html5 browsers 
+                flowplayerRoot: null
+            },
+
+            _name: 'UXF.AudioPlayer.Widget.AudioPlayer',
+            _player: null,
+            
+            _create: function() {
+                this.options = $.extend({}, this.defaults, this.options);
+                this.options.hasHtml5Support = browserUtils.hasHtml5AudioSupport();
+                debug.log('audio player config hasHtml5Support - ' + this.options.hasHtml5Support);
+                this._initialize();
+            },
+
+            _initialize: function() {
+                var playerParent, playerDiv, playerElement;
+
+                if (!this.options.hasHtml5Support && !this.options.flowplayerRoot) {
+                    debug.error(this._name +  ' - flowplayerRoot must be set for non-HTML5 browsers');
+                    throw new Error (this._name +  ' - flowplayerRoot must be set for non-HTML5 browsers');
+                }
+                
+                // if we don't have a player yet, create one.
+                if ($('#uxf-audio-player-instance').length === 0) {
+                    playerParent = $('body');
+                    playerDiv = $('<div id="uxf-audio-player-instance"/>');
+                    playerParent.append(playerDiv);
+
+                    if (this.options.hasHtml5Support) {
+                        playerElement = $('<audio id="uxf-audio-player"/>');
+                        playerDiv.append(playerElement);
+                        this._player = playerElement[0];
+                    } else {
+                        this._player = flowplayer('uxf-audio-player-instance',
+                            this.options.flowplayerRoot + '/flowplayer-3.2.7.swf', {
+                                plugins: {
+                                    audio: {
+                                        url: this.options.flowplayerRoot + '/flowplayer.audio-3.2.2.swf'
+                                    }
+                                },
+                                onError: function (code, msg) {
+                                    debug.error("flowplayer error - code=" + code + ", message = " + msg);
+                                }
+                               
+                                  // enable logging for debugging purpose - http://flash.flowplayer.org/documentation/configuration/player.html#logprops
+//                                ,
+//                                debug: true,
+//                                log : {
+//                                        level  : 'debug',
+//                                        filter : 'org.flowplayer.audio.*'
+//                                }
+                        });
+                    }
+                 
+                    debug.log('audio player instance created');
+                }
+                else {
+                    // the audio player element was previously created into the dom. an example scenario would be when user navigates to a 
+                    // different page in an single page ajax application and later comes back to the page that requires audio player
+                    if (!this._player) {
+                        if (this.options.hasHtml5Support) {
+                            this._player = $('#uxf-audio-player')[0];
+                        } else {
+                            this._player = flowplayer('uxf-audio-player-instance');
+                        }
+                    }
+                    debug.log('audio player instance obtained from DOM');
+                }
+             },
+
+             /**
+              * initialize the widget after it has been created
+              */
+             init: function(config) {
+                 // this.options was set in _create()
+                 this.options = $.extend({}, this.options, config);
+                 this._initialize();
+             },
+             
+             pause: function() {
+                 if (this._player) {
+                     if (this.options.hasHtml5Support) {
+                         this._player.pause(); 
+                     } else {
+                         // note that calling pause on some audio had no effect. Upgrading to flowplayer 3.2.16 resolves this issue. But some host web app
+                         // like OLE still use the older version of flowplayer
+                         this._player.stop(); 
+                     }
+                     debug.log('audio player paused');
+                 }
+             },
+             
+             stop: function() {
+                 if (this._player) {
+                     if (this.options.hasHtml5Support) {
+                         this._player.pause();
+                         // http://stackoverflow.com/questions/14834520/html5-audio-stop-function
+                         if (this._player.currentTime !== 0) {
+                             // this prevents the error 'invalidstateerror dom exception 11'
+                             this._player.currentTime = 0;
+                         }                        
+                     } else {
+                         this._player.stop(); 
+                     }
+                     debug.log('audio player stopped');
+                 }
+             },
+              
+             play: function() {
+                 var audioURL = this.options.audioURL, audioType = this.options.audioType;
+                 
+                 // player object is missing
+                 if ( !this._player ) {
+                     debug.error(this._name +  ' player object is missing');
+                     throw new Error(this._name +  ' player object is missing');
+                 }
+                 if ( !audioURL ) {
+                     debug.error(this._name +  ' audioURL is missing');
+                     throw new Error(this._name +  ' audioURL is missing');
+                 }
+   
+                 // using html5 audio tag
+                 if (this.options.hasHtml5Support) {
+                     if (!this._player.paused ) {
+                         this._player.pause();
+                     }
+                     this._player.src = audioURL;
+                     if (audioType){
+                         this._player.setAttribute('type', audioType.toLowerCase());
+                     }
+                     this._player.load();
+                     this._player.play();
+
+                 // using flash flowplayer
+                 } else {
+                     this._player.play(audioURL);
+                 }
+             },
+             
+            /** Destroys the audio player widget */
+            destroy: function() {
+                debug.log('audio player destroy called');
+                $.Widget.prototype.destroy.call(this);
+            }
+
+        });
+
+        return $.fn.audioplayer;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * backboneextensions.js
+ */
+
+/*global UXF */
+
+UXF.Module.define({
+    name: 'UXF.Common.BackboneExtensions',
+    dependencies: ['Backbone.Memento'],
+    initArgs: ['Backbone', '_'],
+    initFunc: function(Backbone, _) {
+        "use strict";
+
+        var oldModel, oldCollection, oldSet, extendedModel, extendedCollection, TmpModel, tmp;
+
+
+        oldModel = Backbone.Model;
+        oldCollection = Backbone.Collection;
+        oldSet = Backbone.Model.prototype.set;
+
+        // override the default Backbone.Model class with this subclass that provides additional functionality for uxf
+        extendedModel = Backbone.Model.extend({
+            constructor: function() {
+                this._memento = new Backbone.Memento(this);
+                this._dirty = false;
+
+                oldModel.apply(this, arguments);
+            },
+
+            exportJSON: function() {
+                var prop,
+                        json = this.toJSON();
+
+                for (prop in json) {
+                    // use export on collections to convert from a Collection object to array...
+                    if (json.hasOwnProperty(prop) && json[prop] instanceof Backbone.Collection) {
+                        json[prop] = json[prop].exportJSON();
+                    }
+                }
+
+                return json;
+            },
+
+            store: function() {
+                this._memento.store.apply(this, arguments);
+                this.trigger("store");
+
+                return this; // chainable
+            },
+
+            restore: function() {
+                this._memento.restore.apply(this, arguments);
+                this.trigger("restore");
+
+                return this; // chainable
+            },
+
+            restart: function() {
+                this._memento.restart.apply(this, arguments);
+                this.trigger("restart");
+
+                return this; // chainable
+            },
+
+            // completely flush out the memento cache (careful!)
+            flush: function() {
+                this._memento = new Backbone.Memento(this);
+                this.trigger("flush");
+
+                return this; // chainable
+            },
+
+            dirty: function(flag) {
+                if(flag === undefined) {
+                    return this._dirty;
+                }
+
+                this._dirty = flag === true;
+
+                return this; // chainable
+            },
+
+            /**
+             * Override the default backbone set method to support data normalization.
+             * This allows you to add a normalize method to any model.  If present,
+             * normalize will be called prior to setting any value.   In the normalize
+             * function you are free to modify the data to ensure that it's in a
+             * friendly format (eg. converting a raw array to a backbone collection)
+             */
+            set: function(key, value, options) {
+                var attrs = {};
+
+                if (_.isObject(key) || key === null) {
+                    attrs = key;
+                    options = value;
+                } else {
+                    attrs = {};
+                    attrs[key] = value;
+                }
+
+                if (attrs && this.normalize) {
+                    this.normalize(attrs);
+                }
+
+                return oldSet.apply(this, [attrs, options]);
+            }
+        });
+
+        extendedCollection = Backbone.Collection.extend({
+            constructor: function() {
+                this._memento = new Backbone.Memento(this);
+                this._dirty = false;
+
+                oldCollection.apply(this, arguments);
+            },
+
+            exportJSON: function() {
+                return this.toJSON();
+            },
+
+            store: function() {
+                this._memento.store.apply(this, arguments);
+                this.trigger("store");
+
+                return this; // chainable
+            },
+
+            restore: function() {
+                this._memento.restore.apply(this, arguments);
+                this.trigger("restore");
+
+                return this; // chainable
+            },
+
+            restart: function() {
+                this._memento.restart.apply(this, arguments);
+                this.trigger("restart");
+
+                return this; // chainable
+            },
+
+            // completely flush out the memento cache (careful!)
+            flush: function() {
+                this._memento = new Backbone.Memento(this);
+                this.trigger("flush");
+
+                return this; // chainable
+            },
+
+            dirty: function(flag) {
+                if(flag === undefined) {
+                    return this._dirty;
+                }
+
+                this._dirty = flag === true;
+
+                return this; // chainable
+            }
+        });
+
+        // replace the default impls...
+        Backbone.Model = extendedModel;
+        Backbone.Collection = extendedCollection;
+
+        TmpModel = Backbone.Model.extend({});
+        tmp = new TmpModel();
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * browser-utils.js
+ * Copied from asset.js and utils.js in ole
+ * Depends on Modernizr.js
+ */
+
+/*global navigator */
+
+UXF.Module.define({
+    name: 'UXF.Common.BrowserUtils',
+    initArgs: ['window', 'Modernizr', 'debug', 'jQuery'],
+    initFunc: function(window, Modernizr,  debug, $) {
+        "use strict";
+
+        //private methods
+        function searchString(thisObj, data) {
+            var i, dataString, dataProp;
+            for (i = 0; i < data.length; i++)	{
+                dataString = data[i].string;
+                dataProp = data[i].prop;
+                thisObj.versionSearchString = data[i].versionSearch || data[i].identity;
+                if (dataString) {
+                    if (dataString.indexOf(data[i].subString) !== -1) {
+                        return data[i].identity;
+                    }
+                }
+                else if (dataProp) {
+                    return data[i].identity;
+                }
+            }
+        }
+
+        function searchVersion(thisObj, dataString) {
+            var index = dataString.indexOf(thisObj.versionSearchString);
+            if (index === -1) {
+                return;
+            }
+            return parseFloat(dataString.substring(index + thisObj.versionSearchString.length+1));
+        }
+
+        var browserUtils = {
+
+            init: function () {
+                this.browser = searchString(this, this.dataBrowser) || "An unknown browser";
+                this.version = searchVersion(this, navigator.userAgent)
+                    || searchVersion(this, navigator.appVersion)
+                    || "an unknown version";
+                this.OS = searchString(this, this.dataOS) || "an unknown OS";
+            },
+
+            dataBrowser: [
+                {
+                    string: navigator.userAgent,
+                    subString: "Chrome",
+                    identity: "Chrome"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "OmniWeb",
+                    versionSearch: "OmniWeb/",
+                    identity: "OmniWeb"
+                },
+                {
+                    string: navigator.vendor,
+                    subString: "Apple",
+                    identity: "Safari",
+                    versionSearch: "Version"
+                },
+                {
+                    prop: window.opera,
+                    identity: "Opera"
+                },
+                {
+                    string: navigator.vendor,
+                    subString: "iCab",
+                    identity: "iCab"
+                },
+                {
+                    string: navigator.vendor,
+                    subString: "KDE",
+                    identity: "Konqueror"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "Firefox",
+                    identity: "Firefox"
+                },
+                {
+                    string: navigator.vendor,
+                    subString: "Camino",
+                    identity: "Camino"
+                },
+                {   // for newer Netscapes (6+)
+                    string: navigator.userAgent,
+                    subString: "Netscape",
+                    identity: "Netscape"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "MSIE",
+                    identity: "Explorer",
+                    versionSearch: "MSIE"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "Gecko",
+                    identity: "Mozilla",
+                    versionSearch: "rv"
+                },
+                {   // for older Netscapes (4-)
+                    string: navigator.userAgent,
+                    subString: "Mozilla",
+                    identity: "Netscape",
+                    versionSearch: "Mozilla"
+                }
+            ],
+
+            dataOS : [
+                {
+                    string: navigator.platform,
+                    subString: "Win",
+                    identity: "Windows"
+                },
+                {
+                    string: navigator.platform,
+                    subString: "Mac",
+                    identity: "Mac"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "iPhone",
+                    identity: "iPhone"
+                },
+                {
+                    string: navigator.userAgent,
+                    subString: "iPad",
+                    identity: "iPad"
+                },
+                {
+                    string: navigator.platform,
+                    subString: "iPad",
+                    identity: "iPad"
+                },
+                {
+                    string: navigator.platform,
+                    subString: "Linux",
+                    identity: "Linux"
+                }
+            ],
+
+            hasHtml5AudioSupport: function(){
+                var noHTML5 =  this.browser === "Firefox" || //firefox doesn't have licensing for mp3 or mp4
+                    this.browser === "Opera" || //same with opera
+                    !Modernizr.audio || //additional fail safe for other browsers ( like IE )
+                    (this.browser === "Explorer" && this.version === 9) || // IE9 doesn't play some files
+                    (this.browser === "Safari" && this.version < 5) ;// and safari 4.0 has spotty support for html5 based on operating system
+                return !noHTML5;
+            },
+
+            /**
+             * DE21001 - ckeditor fields in chrome browser add a  HTML line break tag after each line.
+             * e.g. calling getData() on user visible empty ckeditor field returns  a "<br />"
+             *
+             * Check to see if the ckeditor field has any user entered text other than space and newline
+             * 
+             * Note: per code review comments the entire ckeditor will be wrapped in a backbone view and this method will be moved at that time
+             * 
+             * @param _$el - the ckeditor element
+             */
+            isCkEditorFieldEmpty: function (_$el) {
+                var isEmpty = false, _text, hasImageTag = false;
+
+                try {
+                        hasImageTag = (_$el.find('.cke_wysiwyg_div').find("img").length > 0 );
+                        if ( !hasImageTag ) {
+                            // use the text() method to strip out all HTML tags like line breaks. Since this method strips out all HTML tags like bold,
+                            // italics, space (&nbsp;) etc and line breaks('\n') we cannot use value returned from this method to send to the server
+                            _text = _$el.find('.cke_wysiwyg_div').text();
+                            isEmpty = ($.trim(_text).length === 0);
+                        }    
+                } catch(err) {
+                    debug.error("failed to check if ckeditor is empty " );
+                    debug.error(err);
+                }
+                return isEmpty;
+            },
+            
+            /*
+             * returns the host operating system name
+             */
+            getHostOS: function() {
+                return this.OS;
+            },
+            
+            /*
+             * returns the version of the browser
+             */
+            getVersion: function() {
+                return this.version;
+            },
+            
+            /*
+             * returns the type of the browser
+             */
+            getBrowserType: function() {
+                return this.browser;
+            }
+        };
+        browserUtils.init();
+
+        return browserUtils;
+    }
+});
+;/*
+ * Copyright 2013, Pearson Education, Learning Technology Group
+ *
+ * buttongroup-view.js
+ */
+
+UXF.Module.define({
+    name: 'UXF.Common.ButtonGroupView',
+    initArgs: ['jQuery', 'Backbone', '_', 'UXF.Common.AbstractView', 'UXF.Common.ButtonView'],
+    initFunc: function($, Backbone, _, AbstractView, ButtonView) {
+        "use strict";
+
+        var View;
+
+        View = AbstractView.extend({
+            options: {
+                buttons: []
+            },
+
+
+            initialize: function() {
+                if (!this.options.buttons || this.options.buttons.length === 0) {
+                    throw new Error('ButtonGroup must be initialized with a button list');
+                }
+            },
+
+
+            render: function() {
+                var container = $('<div/>').addClass('uxf-button-group');
+
+                _.each(this.options.buttons, function(btn) {
+                    container.append(btn.render().$el);
+                }, this);
+
+                this.$el.empty();
+                this.$el.append(container);
+
+                return this;
+            }
+        });
+
+
+        View.newInstance = function(parent, opts) {
+            return new View(parent, opts);
+        };
+
+
+        return View;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * buttonview.js
+ */
+
+/*global UXF */
+
+/**
+ * Button widget.  This is intended to create an OLE style button.
+ *
+ * One point of note.  This is not intended to be used by setting $el.  Instead,
+ * you'll need to render() the component and then append it to the appropriate
+ * place in the UI.
+ *
+ * Example:
+ *
+ * <div class='button-box'><!- button goes here --></div>
+ *
+ * var button = ButtonView.newInstance(null, {
+ *      label: 'Click Me!'
+ * });
+ *
+ * $('.button-box').append(button.render().$el);
+ *
+ * Options:
+ * - id:  (optional) The id to put on the button
+ * - iconClass:  (optional) The iconClass to use if you want an icon on the button.
+ * - iconValue:  (optional) The value to use for the icon
+ * - classes:  (optional) Any additional classes to apply to the button
+ * - href:  (optional) The href for the anchor -- if not specified will use "javascript://"
+ * - target: (optional) The target attribute for the anchor
+ * - label: (required) The button text
+ * - click: (optional) Handler for when the button is clicked.  Users can either
+ *          pass in handler, can listen for the jquery event themselves or bind
+ *          to the backbone "click" event on this view.  If you listen for the jquery
+ *          event, you are responsible for checking if the button is disabled.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.ButtonView',
+    initArgs: [
+        'jQuery',
+        'Backbone',
+        '_',
+        'UXF.Common.AbstractView',
+        'UXF.Common.Classes',
+        'UXF.Common.Templates'
+    ],
+    initFunc: function($, Backbone, _, AbstractView, CommonClasses, Templates) {
+        "use strict";
+
+
+        var View,
+        // HACK!  Can't find a way to disable the javascript URL checks in jslint
+            href1 = 'java',
+            href2 = 'script://';
+
+
+        View = AbstractView.extend({
+            tagName: 'button',
+            className: CommonClasses.button.button,
+
+            options: {
+                id: null,
+                iconClass: null,
+                iconValue: null,
+                classes: null,
+                href: href1 + href2,
+                target: null,
+                label: '',
+                click: null
+            },
+            classes: CommonClasses.button,
+            selectors: {
+                icon: 'icon'
+            },
+            templates: {
+                body: Templates.button
+            },
+            events: {
+                'click': '_handleClick'
+            },
+
+
+            initialize: function() {
+                this._isEnabled = true;
+            },
+
+
+            setEnabled: function(val) {
+                this._isEnabled = val;
+                if (val) {
+                    this.$el.removeClass(this.classes.disabled);
+                } else {
+                    this.$el.addClass(this.classes.disabled);
+                }
+            },
+
+
+            isEnabled: function() {
+                if (this._isRendered()) {
+                    return !this.$el.hasClass(this.classes.disabled);
+                } else {
+                    return this._isEnabled;
+                }
+            },
+
+
+            render: function() {
+                var cache = $('<span/>').addClass(this.classes.button);
+
+                cache.html(this.templates.body(this.options));
+
+                if (this.options.id) {
+                    cache.attr('id', this.options.id);
+                }
+                if (this.options.iconClass) {
+                    cache.addClass(this.classes.iconButton);
+                    cache.addClass(this.options.iconClass);
+                }
+
+                if (this.options.classes) {
+                    cache.addClass(this.options.classes);
+                }
+
+                this.setElement(cache);
+                this.setEnabled(this._isEnabled);
+
+                return this;
+            },
+
+
+            _isRendered: function() {
+                return this.$('.uxf-button-label').length > 0;
+            },
+
+
+            _handleClick: function(event) {
+                event.preventDefault();
+
+                if (this.$el.hasClass(this.classes.disabled)) {
+                    return;
+                }
+
+                this.trigger('click', event, this);
+                // if there is a click handler and the button is not disabled...
+                if (this.options.click) {
+                    this.options.click(event, this);
+                }
+            }
+        });
+
+
+        View.newInstance = function(parent, opts) {
+            return new View(parent, opts);
+        };
+
+        return View;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * classes.js
+ */
+
+/*global UXF */
+
+/**
+ * This is intended to make configuring class names much easier.  Rather than
+ * having to pass the full list of class names to use to the object constructor,
+ * this allows you to globally change the default values for an app.  I suspect
+ * this will be much more useful.  Every component should have it's own set of
+ * default classes.
+ *
+ * UPDATE:  Obsolete.  We decided not to support this.  References to this class
+ * should be removed.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.Classes',
+    initArgs: [],
+    initFunc: function() {
+        "use strict";
+
+        var disabled = 'uxf-disabled',
+            classes = {
+                formBox: {
+                    title: 'uxf-formbox-title',
+                    instructionBar: 'uxf-formbox-instruction-bar',
+                    titleBar: 'uxf-formbox-title-bar',
+                    header: 'uxf-formbox-header',
+                    footer: 'uxf-formbox-footer',
+                    arrow: 'uxf-formbox-arrow',
+                    arrowInner: 'uxf-formbox-arrow-inner',
+                    body: 'uxf-formbox-body',
+                    box1: 'uxf-formbox-box',
+                    box2: 'uxf-formbox-box-inner1',
+                    box3: 'uxf-formbox-box-inner2',
+                    content: 'uxf-formbox-content'
+                },
+                tabBar: {
+                    tabbar: 'uxf-tabbar',
+                    tab: 'uxf-tabbar-tab',
+                    selected: 'uxf-tabbar-selected',
+                    content: 'uxf-tabbar-content'
+                },
+                button: {
+                    button: 'uxf-button',
+                    buttonLabel: 'uxf-button-label',
+                    icon: 'uxf-button-icon',
+                    disabled: disabled,
+                    secondary: 'uxf-button-secondary',
+                    iconButton: 'uxf-icon-button'
+                },
+                quickLinks: {
+                    quickLinks: 'uxf-quicklinks',
+                    dropdownLinks: 'uxf-dropdownlinks',
+                    editLink: 'uxf-edit-link',
+                    removeLink: 'uxf-remove-link',
+                    addLink: 'uxf-add-link',
+                    previewLink: 'uxf-preview-link',
+                    printLink: 'uxf-print-link',
+                    alt: 'uxf-quicklinks-alt',
+                    saveLink: 'uxf-save-link',
+                    cancelLink: 'uxf-cancel-link'
+                }
+        };
+
+        return classes;
+    }
+});
+
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * collectionview.js
+ */
+
+/*global jQuery, Backbone, _, UXF: true */
+
+/**
+ * Custom base class to handle views that contain a collection of child views.
+ * This class automatically listens for add, remove and reset operations and
+ * will re-render the child element list when changes occur.  It does not listen
+ * for change events in the child models so each child view should handle that
+ * on their own.
+ *
+ * Note: like AbstractView, all classes that extend this class will need to pass
+ * in a parent as well as options during instantiation.  eg.  (new View(parent, {});
+ * vs. the normal Backbone method of new View({});).  Parent can be null for top
+ * level widgets (or for testing), but any child views that are instantiated from
+ * your classes should correctly pass in 'this' (in most cases) as the parent.
+ *
+ * Options:
+ * template (optional):         The template string for this view.  If not provided
+ *                              will just use $el.
+ * collectionName:              The name of the child collection in model.  This is
+ *                              optional if no model is specified and the view is
+ *                              attached to a collection.
+ * containerSelector (optional):The HTML class name to render child elements into.  If
+ *                              not set, the $el will be used.
+ * viewClass (required):        The type of the child views.  Should extend Backbone.View
+ * viewName (optional):         Name of the view.  Used for error messages and debugging
+ *
+ * Example 1:  using a model that contains a child collection:
+ * Model: {
+ *      field1: 'some-field',
+ *      field2: 'some-field',
+ *      children: [...]
+ * }
+ *
+ * var MyView = UXF.CollectionView.extend({
+ *      options: {
+ *          template:  '<div><%= field1 %></div><div class="uxf-children"></div>',
+ *          collectionName: 'children'  // matches name in model
+ *          containerSelector: 'uxf-children' // matches class name in template
+ *          viewClass:  someViewClass      // view class that renders children
+ *          viewName:  'MyView'            // name of the view
+ *      }
+ * });
+ *
+ * var view = new MyView(parent, {
+ *      model:  new Model()
+ * });
+ *
+ *
+ * Example 2: using a raw collection as the model
+ * var MyView = UXF.CollectionView.extend({
+ *      options: {
+ *          template:  '<div>stuff</div><div class="uxf-children"></div>',
+ *          containerSelector:     // matches class name in template
+ *          viewClass:          // view class that renders children
+ *          viewName:  'MyView' // name of the view
+ *
+ * });
+ *
+ * var view = new MyView(parent, {
+ *      collection:  new CollectionType()
+ * });
+ */
+UXF.Module.define({
+    name: 'UXF.Common.CollectionView',
+    initArgs: ['jQuery', 'Backbone', '_', 'UXF.Common.AbstractView'],
+    initFunc: function($, Backbone, _, AbstractView) {
+        "use strict";
+
+        var CollectionView = AbstractView.extend({
+            constructor: function(parent, options) {
+                this.parent = parent;
+                this.cid = _.uniqueId('view');
+
+                // maps from model cids to views
+                this._viewMap = {};
+
+                this._configure(options || {});
+                this._ensureElement();
+                this._init(options || {});
+                this.delegateEvents();
+            },
+
+
+            _init: function() {
+                var collection = null, name = null;
+
+                // precompile the template...
+                if (this.options.template) {
+                    this.viewTemplate = this._compileTemplate(this.options.template);
+                }
+
+                collection = this.getChildCollection();
+                if (!collection) {
+                    name = this.options.viewName || "CollectionView";
+                    throw 'No child collection found for ' + name;
+                }
+
+                collection.bind('add', this.addView, this);
+                collection.bind('remove', this.removeView, this);
+                collection.bind('reset', this.resetView, this);
+
+                // if the collection is changed, rebind the events...
+                if (this.model && this.options.collectionName) {
+                    this.model.bind('change:' + this.options.collectionName, this._collectionChanged, this);
+                }
+
+                // call the initialize function bound to 'this'
+                this.initialize.apply(this, arguments);
+            },
+
+
+            /**
+             * IMPORTANT:  If you override render, be sure to call renderChildren.
+             */
+            render: function() {
+                if (this.options.template) {
+                    this._renderTemplate(this.viewTemplate, this.model);
+                }
+
+                this.renderChildren();
+
+                return this;
+            },
+
+            /**
+             *  If options.index is provided, then add to that location.
+             *  Otherwise, append to the end.
+             */
+            addView: function(model, collection, options) {
+                var view,
+                    container;
+
+                // create and cache the new view
+                view = this._cacheView(model, options);
+
+                // if the child view container is visible, then render and
+                // append the view immediately to the appropriate location
+                container = this._getChildViewContainer();
+                if (container && container.is(":visible")) {
+                    view.render();
+
+                    // if option.index is provided, add to the appropriate location;
+                    // otherwise append to the end
+                    if (options && options.index < container.children().length) {
+                        // insert view element in before the given index
+                        $(container.children()[options.index]).before(view.el);
+                    } else {
+                        container.append(view.el);
+                    }
+                }
+            },
+
+            removeView: function(model, collection, options) {
+                var view = this._viewMap[model.cid];
+                if (view) {
+                    // remove the view's element from the DOM
+                    view.$el.remove();
+
+                    // allows implementing class to manually remove listeners
+                    this.onChildViewDestroyed(this._viewMap[model.cid], options);
+
+                    // destroy the view (to allow events to be unbound) */
+                    this._viewMap[model.cid].destroy();
+
+                    // remove from map
+                    delete this._viewMap[model.cid];
+                }
+            },
+
+
+            /**
+             * 1. Backup and clear the cache
+             * 2. Render children (recreates views)
+             * 3. Destroy old views from original cache.
+             */
+            resetView: function(collection, options) {
+                var oldCache = this._viewMap;
+
+                // clear cache without destroying old views yet
+                this._viewMap = {};
+
+                // render children (if necessary)
+                this.renderChildren(options);
+
+                // finally destroy children in the old cache
+                this._resetCache(oldCache);
+            },
+
+
+            /**
+             * For now, this calls render on the entire collection.
+             * You should not have to render once render has been called once.
+             */
+            renderChildren: function(options) {
+                var container,
+                    collection,
+                    view,
+                    offscreenContainer;
+
+                container = this._getChildViewContainer();
+                // only render children once their container exists (has been rendered)
+                if (!container) {
+                    return;
+                }
+
+                // model collection that will be rendered
+                collection = this.getChildCollection();
+
+                // offscreenContainer to render into for efficiency sake
+                // the views will be moved into the real container at the end
+                offscreenContainer = $('<div/>');
+
+                // allow subclass to implement functionality before render
+                this.preRenderChildren(collection);
+
+                // create or get view, render it, and add it to the offscreenContainer
+                collection.each(function(model) {
+                    view = this._cacheView(model, options);
+                    offscreenContainer.append(view.render().el);
+                    view.setElement(view.el);
+                }, this);
+
+                // now move views from off-screen container to real container
+                container.empty();
+                container.append(offscreenContainer.children());
+                offscreenContainer.remove();
+
+                // allow subclass to implement functionality before render
+                this.postRenderChildren(collection);
+            },
+
+
+            getChildCollection: function() {
+                var collection;
+
+                // lookup the child collection...
+                if (this.model && this.options.collectionName) {
+                    collection = this.model.get(this.options.collectionName);
+
+                    // if there is no collectionName and the view has a collection
+                    // element, use that...
+                } else if (this.collection) {
+                    collection = this.collection;
+                }
+
+                return collection;
+            },
+
+
+            /**
+             * Returns cached view if it exists, or creates
+             * a new view, caches it and returns it
+             */
+            _cacheView: function(model, options) {
+                // if the view already exists, just return it
+                var view = this._viewMap[model.cid];
+                if (view) {
+                    return view;
+                }
+
+                view = this._createView(model);
+
+                this.onChildViewCreated(view, options);
+
+                this._viewMap[model.cid] = view;
+
+                return view;
+            },
+
+
+            /**
+             * Method that creates a child view before it is cached.   By default,
+             * this method will get called with just a model.  It can be overridden
+             * to provide additional options to pass through to the child view.
+             * If overridden, the child view can either instantiate the view itself
+             * or it can call CollectionView.prototype._createView and pass along
+             * a second optional argument.
+             *
+             * Example (in derived class):
+             * _createView: function(model) {
+             *      return CollectionView.prototype._createView.apply(this, [model, this.options.customOpts]);
+             * }
+             *
+             *
+             * @param model the model for the child view
+             * @param otherOpts not used by default.  Placeholder for derived classes
+             *          to simply add custom options.
+             * @return {*}
+             * @private
+             */
+            _createView: function(model, otherOpts) {
+                var opts = _.extend({
+                    model: model
+                }, otherOpts);
+
+                // prefer the factory method if it exists.
+                if (this.options.viewClass.newInstance) {
+                    return this.options.viewClass.newInstance(this, opts);
+                }
+
+                // fall back...
+                return new this.options.viewClass(this, opts);
+            },
+
+
+            /**
+             * Callback for after a child view has been created.   This is intended
+             * to allow you to bind custom events to the child view.
+             *
+             * @param view the view being created
+             * @param options the list of options from the model event - may be undefined
+             */
+            onChildViewCreated: function(view, options) {
+            },
+
+
+            /**
+             * Allow special handling before rendering children.
+             *
+             * @param collection the collection of models to be rendered.
+             */
+            preRenderChildren: function(collection) {
+            },
+
+
+            /**
+             * Allow special handling after rendering all children.
+             *
+             * @param collection the collection of models
+             */
+            postRenderChildren: function(collection) {
+            },
+
+
+            /**
+             * Callback that will be called just before a view is destroyed.  This
+             * is to allow the instance to unbind from any events before the view
+             * is destroyed.
+             *
+             * @param view the view being destroyed
+             * @param options the list of options from the model - may be undefined
+             */
+            onChildViewDestroyed: function(view, options) {
+            },
+
+
+            /**
+             * Handler for the case where a new collection is bound to the model.
+             */
+            _collectionChanged: function() {
+                var collection, oldCollection;
+
+                collection = this.getChildCollection();
+
+                // unbind from the old model if it's changed...
+                if (this.model && this.options.collectionName) {
+                    oldCollection = this.model.previous(this.options.collectionName);
+                    if (oldCollection && oldCollection !== collection) {
+                        oldCollection.unbind('add', this.addView);
+                        oldCollection.unbind('remove', this.removeView);
+                        oldCollection.unbind('reset', this.resetView);
+                    }
+                }
+
+                // bind to the new collection...
+                if (collection && oldCollection !== collection) {
+                    collection.bind('add', this.addView, this);
+                    collection.bind('remove', this.removeView, this);
+                    collection.bind('reset', this.resetView, this);
+                }
+
+                this.resetView();
+            },
+
+
+            /**
+             * Get the container to render children into.
+             * If it wasn't yet rendered, it may be null
+             * @return {*}
+             * @private
+             */
+            _getChildViewContainer: function() {
+                var container;
+                if (this.options.containerSelector) {
+                    // locate returns an array, even though we want the single container
+                    container  = this.locate(this.options.containerSelector);
+                    // if it can't be located yet, return null
+                    if (!container || container.length === 0) {
+                        return null;
+                        // otherwise return the container
+                    } else {
+                        return $(container[0]);
+                    }
+                }
+
+                return this.$el;
+            },
+
+
+            /**
+             * Destroy all cached views and reset the cache.
+             * @private
+             */
+            _resetCache: function(cache) {
+                // cache is provided to this method in the case that
+                // we store the cache to the side for later clean-up
+                if (!cache) {
+                    cache = this._viewMap;
+                }
+                _.each(cache, function(view) {
+                    this.onChildViewDestroyed(view);
+                    view.destroy();
+                }, this);
+
+                cache = {};
+            },
+
+
+            /**
+             * Actually render to main body.  This can be overridden in child classes
+             * to provide custom rendering.
+             *
+             * @param template the configured template.
+             * @param model the model -- may be null if using a collection as the model
+             * @param any additional params will be extended into the template args.
+             *      This is intended just to make it easier for classes that override
+             * @protected
+             */
+            _renderTemplate: function(template, model) {
+                var i = 0,
+                    args = [ {},
+                        model ? model.toJSON() : {}
+                    ];
+
+                if (arguments.length > 2) {
+                    for (i = 2; i < arguments.length; i++) {
+                        args.push(arguments[i]);
+                    }
+                }
+
+                this.$el.html(this.execTemplate(template, _.extend.apply(this, args)));
+            },
+
+
+            /**
+             * Returns this class's selectors (if any) with the child class's selectors (if any)
+             * included as "children".
+             */
+            getSelectors: function() {
+                var selectors = this.selectors || {};
+
+                _.extend(selectors, {children: this.options.viewClass.prototype.getSelectors()});
+
+                return selectors;
+            },
+
+
+            /**
+             * Clean up collection view specific stuff.
+             */
+            onDestroyInternal: function() {
+                var collection;
+
+                this._resetCache();
+
+                this._viewMap = null;
+
+                collection = this.getChildCollection();
+                this.collection = null;
+                if (!collection) {
+                    return;
+                }
+
+                collection.unbind('add', this.addView);
+                collection.unbind('remove', this.removeView);
+                collection.unbind('reset', this.resetView);
+
+                if (this.options.collectionName) {
+                    this.model.unbind('change:' + this.options.collectionName, this._collectionChanged);
+                }
+
+                // destroy this last
+                AbstractView.prototype.onDestroyInternal.apply(this);
+            },
+
+
+            /**
+             * Dummy onDestroy method.
+             */
+            onDestroy: function() {
+            }
+
+        });
+        CollectionView.extend = Backbone.View.extend;
+
+
+        return CollectionView;
+
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * config.js
+ */
+
+/*global UXF */
+
+/**
+ * Factory for creating a config object
+ */
+UXF.Module.define({
+    name: 'UXF.Common.ConfigFactory',
+    initArgs: ['_'],
+    initFunc: function(_) {
+        "use strict";
+
+        /**
+         * @namespace UXF.Common.ConfigFactory
+         * @desc returns a function that creates a config object.  The config object contains an
+         * init() member that can be used to initialize the object with default settings.  The function,
+         * if executed with just a key value, will return the config value.  If passed a key and a value
+         * it will set the config value.
+         *
+         * @example
+         * var config = UXF.Common.ConfigFactory();
+         *
+         * config.init({'key1': 'val1'});
+         * config('key1') == 'val1';
+         * config('key2', 'val2');  // sets key2 to val2
+         */
+        return function() {
+            var config = {},
+                ret;
+
+            ret = function(key, val) {
+                if (val) {
+                    config[key] = val;
+                    return ret;  // chainable, but syntax is so goofy not really useful
+                }
+
+                return config[key];
+            };
+
+
+            ret.init = function(data) {
+                _.extend(config, data);
+            };
+
+            return ret;
+        };
+    }
+});
+;/*
+ * Copyright 2013, Pearson Education, Learning Technology Group
+ *
+ * eventbus.js
+ */
+
+/**
+ * @module UXF.Common.EventBus
+ * @desc Define a global pub/sub event bus.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.EventBus',
+    initArgs: ['_', 'Backbone'],
+    initFunc: function(_, Backbone) {
+        "use strict";
+
+        /**
+         * @namespace EventBus
+         */
+        var Bus = _.extend({}, Backbone.Events);
+
+        /**
+         * Destroy all listeners for events by namespace.  Allows us to globally clean up event listeners for a module.
+         * The individual widgets should clean up after themselves, but just in case something doesn't work right
+         * this is just to reduce the potential of memory leaks.
+         *
+         * @param namespace event namespace.  eg. if you have an event 'assessment-builder:publish-event' and you
+         * call destroyNamespace('assessment-builder') it should destroy the listener.
+         */
+        Bus.destroyNamespace = function(namespace) {
+            _.each(Bus._callbacks, function(callback, name) {
+                if (name && name.indexof(namespace + ':') === 0) {
+                    delete Bus._callbacks[name];
+                }
+            });
+        };
+
+        return Bus;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * i18n.js
+ */
+
+/*global jQuery, _, UXF, Jed */
+
+
+/**
+ * @module UXF.Common
+ *
+ * @desc Module for internationalization.  This is a thin wrapper around jed.  The
+ * intention is to allow us to later swap out another i18n lib if required.
+ *
+ * This library is expected to be initialized by passing in a jed/gettext pojson
+ * object.
+ * See:
+ * http://slexaxton.github.com/Jed/ or
+ * http://jsgettext.berlios.de/doc/html/Gettext.html
+ *
+ * for more details.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.i18n',
+    initArgs: ['jQuery', '_', 'Jed', 'UXF.Common.EventBus', 'debug'],
+    initFunc: function($, _, Jed, EventBus, debug) {
+        "use strict";
+
+        var i18n, jed, normalizePoJSON, oldSettings, rootPath, fileSet,
+                init, convertHeaderFromJson, convertFromJson, convertLevel, convertValue;
+
+        /**
+         * Initialize the i18n lib.  Expects a pojson object.  This format is
+         * used by both Jed and gettext.
+         *
+         * @param pojson
+         * @private
+         */
+        init = function(pojson) {
+            var data = normalizePoJSON(pojson);
+            jed = new Jed(data);
+        };
+
+
+        /**
+         * @param pojson
+         * @returns {*} A pojson object structured to work with Jed
+         * @private
+         */
+        normalizePoJSON = function(pojson) {
+            var data = pojson || {
+                domain: 'uxf',
+                locale_data: {
+                    uxf: {
+                        '': {
+                            domain: 'uxf',
+                            lang: 'en',
+                            plural_forms: 'nplurals=2; plural=(n != 1);'
+                        }
+                    }
+                }
+            };
+
+            // if we get the gettext format, attach the jed wrapper...
+            if (!data.locale_data) {
+                data = {
+                    domain: 'uxf',
+                    locale_data: data
+                };
+            }
+
+            return data;
+        };
+
+
+        /**
+         * @param header
+         * @returns {{}}
+         * @private
+         */
+        convertHeaderFromJson = function(header) {
+            var domain = header.domain || 'uxf',
+                    data = {};
+
+            data[domain] = {
+                '': {
+                    domain: header.domain || 'uxf',
+                    lang: header.lang || 'en',
+                    plural_forms: header.plural_forms || 'nplurals=2; plural=(n != 1)'
+                }
+            };
+
+            return data;
+        };
+
+
+        /**
+         *
+         * @param domain
+         * @param json
+         * @param root
+         * @private
+         */
+        convertLevel = function(domain, json, root) {
+            _.each(json, function(obj, key) {
+                var fullKey = root + '.' + key;
+
+                if (!convertValue(domain, obj, fullKey)) {
+                    // another level...
+                    convertLevel(domain, obj, fullKey);
+                }
+            });
+        };
+
+
+        /**
+         *
+         * @param domain
+         * @param obj
+         * @param key
+         * @returns {boolean}
+         * @private
+         */
+        convertValue = function(domain, obj, key) {
+            if (_.isString(obj)) {
+                domain[key] = [null, obj];
+
+            } else if (_.isArray(obj)) {
+                domain[key] = obj;
+
+            } else {
+                return false;
+            }
+
+            return true;
+        };
+
+
+        /**
+         *
+         * @param json
+         * @returns {*}
+         * @private
+         */
+        convertFromJson = function(json) {
+            var pojson;
+
+            pojson = convertHeaderFromJson(json['']);
+
+            _.each(json, function(obj, key) {
+                var domain = json[''].domain;
+
+                if (key !== '' && !convertValue(pojson[domain], obj, key)) {
+                    convertLevel(pojson[domain], obj, key);
+                }
+            });
+
+            return pojson;
+        };
+
+
+        /**
+         * @namespace
+         */
+        i18n = {
+            /**
+             * Set the configuration for the i18n lib.
+             *
+             * @param opts  Options.  Expected properties:
+             *      rootPath:  the rootPath to the json files that contain i18n text
+             *      fileSet: (optional) the set of files
+             */
+            configure: function(opts) {
+                rootPath = opts.rootPath;
+                fileSet = opts.fileSet;
+            },
+
+
+            /**
+             * Get the lang key for the currently selected lang.
+             *
+             * @returns {*} the language string (eg. "en", "es")  May be null if jed is not initialized.
+             */
+            getLang: function() {
+                if (jed && jed.options) {
+                    return jed.options.locale_data.uxf[''].lang;
+                }
+
+                return null;
+            },
+
+
+            /**
+             * Merge another pojson object into this lib.  Can not change the
+             * default domain.  pojson file must be for the same lang as the
+             * currently loaded config.
+             *
+             * @param pojson
+             */
+            merge: function(pojson) {
+                var data = normalizePoJSON(pojson);
+
+                // if not initialized, call init instead...
+                if (!jed) {
+                    return init(data);
+                }
+
+                // make sure we are not trying to handle multiple langs...
+                // we currently expect the server to load the correct pojson file
+                // or to 'add' the appropriate keys for the given lang.  Client side
+                // lang switching must be done using load()
+                $.each(data.locale_data, function(domain, value) {
+                    if (!value['']) {
+                        // if no header is defined, copy one from the uxf defaults.
+                        value[''] = {
+                            lang: jed.options.locale_data.uxf[''].lang,
+                            domain: jed.options.locale_data.uxf[''].domain,
+                            plural_forms: jed.options.locale_data.uxf[''].plural_forms
+                        };
+                    }
+
+                    if (value[''].lang !== jed.options.locale_data.uxf[''].lang) {
+                        throw 'i18n library currently only supports loading 1 lang at a time';
+                    }
+
+                    // merge data with existing domains.  Create new domains
+                    // if necessary.
+                    if (jed.options.locale_data[domain]) {
+                        _.extend(jed.options.locale_data[domain], value);
+                    } else {
+                        jed.options.locale_data[domain] = value;
+                    }
+                });
+            },
+
+
+            /**
+             * Add key values with the existing i18n object.
+             *
+             * @param domain (optional) the domain for the keys being added.
+             * @param data the data to add.   values in the data object should either
+             * contain single strings or properly formed arrays.  If passing in arrays,
+             * the first value should be null.  Array size will depend on the
+             * number of plural forms required for each language.
+             *
+             * @example
+             * i18n.add({
+             *      key1:  'Test key',
+             *      key2:  [ null, 'Singular value', 'Plural value' ]
+             * });
+             */
+            add: function(domain, data) {
+                var fixedData = {};
+
+                // domain is optional...
+                if (!data && typeof domain === 'object') {
+                    data = domain;
+                    domain = 'uxf';
+                }
+
+                // if data like { key: val } is passed in, format to correctly account
+                // for the pluralized form ( [ null, val ] )
+                $.each(data, function(key, val) {
+                    if (!_.isArray(val)) {
+                        val = [null, val, val];
+                    }
+
+                    fixedData[key] = val;
+                });
+
+                // if the domain doesn't exist, create one modeled from the uxf domain.
+                if (!jed.options.locale_data[domain]) {
+                    jed.options.locale_data[domain] = {
+                        '': {
+                            domain: jed.options.locale_data.uxf[''].domain,
+                            lang: jed.options.locale_data.uxf[''].lang,
+                            plural_forms: jed.options.locale_data.uxf[''].plural_forms
+                        }
+                    };
+                }
+
+                _.extend(jed.options.locale_data[domain], fixedData);
+            },
+
+
+            /**
+             * Lookup a key value in the local value.
+             *
+             * The key value can contain an optional domain prefix.  Prefix can be
+             * specified like:  'domain:key'  where "domain" is the domain.  By default
+             * this method will only look at the 'uxf' domain.  If this lib is used
+             * to add additional i18n data then you will be required to pass in a
+             * context.
+             *
+             * @param key the key value.  The key value can contain a domain prefix.
+             * @param args (optional) the arguments to pass to the format
+             * @param plural (optional) the number to use for pluralization
+             * @return the internationalized string.
+             */
+            local: function(key, args, plural) {
+                var domain = 'uxf',
+                    parts;
+
+                plural = (plural === undefined  || plural === null) ? 1 : plural;
+
+                if (/:/.test(key)) {
+                    parts = key.split(':', 2);
+                    domain = parts[0];
+                    key = parts[1];
+                }
+
+                return jed.translate(key)
+                    .onDomain(domain)
+                    .ifPlural(plural, key)
+                    .fetch(args);
+            },
+
+
+            /**
+             * Load i18n bundles.
+             *
+             * @param lang the lang key to use (eg. en, es)
+             * @param files (optional) The list of i18n files to load
+             * @param async (optional) Should the ajax call to load by async
+             */
+            load: function(lang, files, async) {
+                var promiseList = [];
+
+                async = _.isBoolean(async) ? async : false;
+                files = files || fileSet;
+
+                // initiate ajax request for all files...
+                _.each(files, function(file) {
+                    var fullPath = rootPath + file + "_" + lang + ".json",
+                            promise;
+
+                    promise = $.ajax(fullPath, {
+                        dataType: 'json',
+                        async: async
+                    });
+                    promiseList.push(promise);
+                });
+
+                // when all responses have returned, re-initialize jed
+                // and merge in all json objects...
+                $.when.apply($, promiseList).done(function(firstArg) {
+                    var responses;
+
+                    // when passing a single arg to $when, responds with,
+                    // standard ajax success args.  When passing a set
+                    // of promises to $when, responds with an array of
+                    // responses.  So, normalize to an array of just the
+                    // raw JSON first.
+                    if (promiseList.length === 1) {
+                        // grr.  Have to name arguments[0] to keep jslint happy
+                        responses = [firstArg];
+                    } else {
+                        responses = _.map(arguments, function(args) {
+                            return args[0];
+                        });
+                    }
+
+                    jed = null;
+                    _.each(responses, function(json) {
+                        var fixed;
+
+                        fixed = convertFromJson(json);
+
+                        if (!jed) {
+                            init(fixed);
+                        } else {
+                            i18n.merge(fixed);
+                        }
+                    });
+
+                    // after lang has been updated notify anyone who might care...
+                    // eg. it may make sense to have assessment-builder re-render itself
+                    EventBus.trigger("i18n.lang-changed", this);
+                }).fail(function() {
+                    debug.error("Error loading i18n files: ", lang, files, async, arguments);
+                });
+            },
+
+
+            /**
+             * Save i18n settings so they can be restored later.   Only intended
+             * for testing.
+             */
+            save: function() {
+                if (jed && jed.options) {
+                    oldSettings = _.extend({}, jed.options);
+                }
+            },
+
+
+            /**
+             * Restore previously saved i18n settings.
+             */
+            restore: function() {
+                // restore the old options...
+                if (oldSettings) {
+                    init(oldSettings);
+                }
+            }
+        };
+
+        init();
+
+        return i18n;
+    }
+});
+;// notification_widget.js
+
+/*global clearTimeout: false, setTimeout: false, UXF*/
+
+UXF.Module.define({
+    name: 'UXF.Common.NotificationWidget',
+    dependencies: ['jQuery.widget'],
+    initArgs: ['window', 'jQuery', '_'],
+    initFunc: function(window, $, _) {
+        "use strict";
+
+        var template = [
+            '<div class="uxf-notification uxf-notification-<%= type %>">',
+                '<div class="uxf-notification-message"><%= message %></div>',
+            '</div>'
+        ].join("");
+
+        $.widget("ui.notification", {
+            options: {
+                type: "error",
+                message: "Hold on. There are still some fields that need to be filled out.",
+                autoOpen: true,
+                autoClose: true,
+                closeTimeout: 4000,
+                scrollToTop: true,
+                effects: {
+                   open: {
+                      effect: "slide",
+                      options: {
+                          direction: "up"
+                      },
+                      speed: 500
+                   },
+                   close: {
+                       effect: "slide",
+                       options: {
+                           direction: "up",
+                           mode: "hide"
+                       },
+                       speed: 800
+                    }
+                }
+            },
+
+            _create: function() {
+                // by default, consider this thing closed.
+                this._isOpen = false;
+
+                // cache the template for this instance
+                this.template = _.template(template);
+
+                this._closeTimer = null;
+
+                // remember this instance
+                $.ui.notification.instances.push(this.element);
+            },
+
+            _init: function() {
+                this._resetCloseTimer();
+
+                this._render();
+
+                // call open if this instance should be open by default
+                if(this.options.autoOpen) {
+                    this.open();
+                }
+            },
+
+            scrollTo: function() {
+                var buffer = 60,
+                    myTop = this.element.offset().top - buffer,
+                    myBottom = this.element.offset().top + buffer;
+
+                if(myTop < $('body').scrollTop() || $('body').scrollTop() + $(window).height() < myBottom) {
+                    $('html, body').animate({scrollTop: myTop}, 'slow');
+                }
+            },
+
+            open: function() {
+                var $this = this.element;
+                this._isOpen = true;
+
+                // trigger beforeopen event.  if beforeopen returns false,
+                // prevent bail out of this method.
+                if(this._trigger("beforeopen") === false) {
+                    return;
+                }
+
+                // call methods on every other instance of this dialog
+                $.each(this._getOtherInstances(), function() {
+                    var $this = $(this);
+
+                    if($this.notification("isOpen")) {
+                        $this.notification("close");
+                    }
+                });
+
+                if(this.options.autoClose) {
+                    this._resetCloseTimer();
+                    this._closeTimer = setTimeout(function() { $this.notification("close"); }, this.options.closeTimeout);
+                }
+
+                this._shell.effect(this.options.effects.open.effect,
+                    this.options.effects.open.options,
+                    this.options.effects.open.speed,
+                    this.options.scrollToTop ? function() { $this.notification("scrollTo"); } : $.noop);
+
+                // trigger open event
+                this._trigger("open");
+
+                return this;
+            },
+
+            close: function() {
+                this._isOpen = false;
+
+                this._shell.effect(this.options.effects.close.effect, this.options.effects.close.options, this.options.effects.close.speed);
+
+                // trigger close event
+                this._trigger("close");
+
+                return this;
+            },
+
+            isOpen: function() {
+                return this._isOpen;
+            },
+
+            destroy: function() {
+                // remove this instance from $.ui.notification.instances
+                var element = this.element,
+                    position = $.inArray(element, $.ui.notification.instances);
+
+                // if this instance was found, splice it off
+                if(position > -1) {
+                    $.ui.notification.instances.splice(position, 1);
+                }
+
+                // call the original destroy method since we overwrote it
+                $.Widget.prototype.destroy.call(this);
+            },
+
+            _resetCloseTimer: function() {
+
+                if(this._closeTimer !== null) {
+                    clearTimeout(this._closeTimer);
+                    this._closeTimer = null;
+                }
+            },
+
+            _render: function() {
+
+                if(this._shell) {
+                    this._shell.remove();
+                }
+
+                this._shell = $(this.template({type: this.options.type, message: this.options.message}));
+
+                this.element.prepend(this._shell);
+
+                if(!this._isOpen) {
+                    this._shell.hide();
+                }
+            },
+
+            _getOtherInstances: function() {
+                var element = this.element;
+
+                return $.grep($.ui.notification.instances, function(el) {
+                    return el !== element;
+                });
+            },
+
+            _setOption: function(key, value) {
+
+                $.Widget.prototype._setOption.apply(this, arguments);
+
+                if(key === "type" || key === "message") {
+                    this._render();
+                }
+            }
+        });
+
+        $.extend($.ui.notification, {
+            instances: []
+        });
+    }
+});
+;/*
+ * Copyright 2013, Pearson Education, Learning Technology Group
+ *
+ * pager.js
+ */
+
+/*globals UXF */
+
+/**
+ * PagerView.  Displays a pager bar.
+ *
+ * Options:
+ * - visiblePagesStrategy: limitPagedStrategyFactory(10) - the page strategy to use.  This should be a function
+ *      that accepts 2 args (currentPage #, totalPages) and it should calculate the pages that should be visible.
+ *      By default will use realize strategy:
+ *          - show up to 10 pages at a time,
+ *          - group pages into sets of 5
+ *          - only allow 1st button in a set to be selected for page 0
+ *          - if 0 - 6 is selected show first 2 groups [0, 1, 2, 3, 4] and [5, 6, 7, 8, 9]
+ *          - if page from last group is selected, show last 2 groups. (ie 22pgs, [15, 16, 17, 18, 19, 20, 21]
+ *          - if selected item position from group is 0, show prev group + current group.  otherwise,
+ *            show current group + next group.
+ *            Example (22 pages):
+ *              select 6 (6 is item 2 of group [5-9] so, [5, 6, 7, 8, 9], [10, 11, 12, 13, 14]
+ *              select 5 (5 is item 1 of group 5-9], so [0, 1, 2, 3, 4], [5, 6, 7, 8, 9]
+ *
+ * - firstText: '<<' (text to use for 'first' button)
+ * - prevText: '<', (text to use for 'prev' button)
+ * - nextText: '>', (text to use for 'next' button)
+ * - lastText: '>>', (text to use for 'last' button)
+ * - showFirstLastButtons: true (should first/last buttons be shown)
+ *
+ * Events:
+ * - pager:change-page:  fired when the current page changes.  Will include a 0 based page number in the payload
+ *
+ * Methods:
+ * - setPageCount(#) - set the number of pages to expect (will reset selected page to 0!)
+ * - setCurrentPage(#) - set the currently selected page.
+ *
+ * HelperFuncs:
+ * - PagerView.limitPagedStrategyFactory(blockSize, offset) - create page strategy using the Realize rules, but with
+ *      custom pageSizes and offsets.
+ * - PagerView.calculatePages(items, blocksize):  calculate the # of pages necessary to display # items.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.PagerView',
+    initArgs: [
+        'jQuery',
+        'Backbone',
+        '_',
+        'UXF.Common.AbstractView',
+        'UXF.Common.Templates'
+    ],
+    initFunc: function($, Backbone, _, AbstractView, Templates) {
+        "use strict";
+
+        var Pager, defaultVisiblePagesStrategy, limitPagedStrategyFactory;
+
+
+        /**
+         * Pager strategy that limits # of visible pages.
+         * @param limit
+         * @param blockSize
+         * @param padding
+         * @returns {Function}
+         */
+        limitPagedStrategyFactory = function(limit, padding) {
+            var blockSize = limit / 2;
+
+            padding = padding || 1;
+
+            return function(current, total) {
+                var block, blockCount;
+
+
+                if (total < limit) {
+                    return _.range(0, total);
+                }
+
+
+                block = Math.floor(current / blockSize);
+                blockCount = Math.floor(total / blockSize);
+
+                if (block === 0 || current >= total) {
+                    return _.range(0, limit);
+                }
+
+                if (block === blockCount) {
+                    return _.range((block - 1) * blockSize, total);
+                }
+
+                if (current % blockSize >= padding) {
+                    return _.range(block * blockSize, Math.min(block * blockSize + limit, total));
+                } else {
+                    return _.range((block - 1) * blockSize, Math.min((block - 1) * blockSize + limit, total));
+                }
+            };
+        };
+
+        Pager = AbstractView.extend({
+            options: {
+                visiblePagesStrategy: limitPagedStrategyFactory(10),
+                firstText: '<<',
+                prevText: '<',
+                nextText: '>',
+                lastText: '>>',
+                showFirstLastButtons: true,
+                displayForSinglePage: false
+            },
+            templates: {
+                body: Templates.pager
+            },
+            selectors: {
+                'firstButton': '.uxf-pager-first',
+                'prevButton': '.uxf-pager-prev',
+                'nextButton': '.uxf-pager-next',
+                'lastButton': '.uxf-pager-last',
+                'currentButton': '.uxf-pager-current',
+                'pageButtons': '.uxf-pager-page'
+            },
+            events: {
+                'click .uxf-pager-first': '_firstPage',
+                'click .uxf-pager-prev': '_previousPage',
+                'click .uxf-pager-next': '_nextPage',
+                'click .uxf-pager-last': '_lastPage',
+                'click .uxf-pager-page': '_selectPage'
+            },
+
+
+            _pageCount: 0,
+            _currentPage: 0,
+
+
+            /**
+             * Page count.  The actual # of pages needed to display the full content.
+             *
+             * @param pageCount
+             */
+            setPageCount: function(pageCount) {
+                this._pageCount = pageCount;
+                this.setCurrentPage(0);
+            },
+
+
+            /**
+             * Set the current visible page.  IMPORTANT:  This is 0 based.
+             * @param page
+             */
+            setCurrentPage: function(page) {
+                var to = Math.max(0, Math.min(this._pageCount - 1, page));
+                if (to === this._currentPage) {
+                    return;
+                }
+
+                this._currentPage = to;
+                this.trigger('pager:change-page', this._currentPage);
+                if (this._isRendered()) {
+                    this.render();
+                }
+            },
+
+
+            render: function() {
+                var pages, opts;
+
+                this.$el.empty();
+                if (this._pageCount === 0) {
+                    this.$el.addClass('uxf-pager-no-pages');
+                    return;
+                }
+
+                pages = this.options.visiblePagesStrategy(this._currentPage, this._pageCount);
+                if (pages <= 1 && !this.options.displayForSinglePage) {
+                    return this;
+                }
+
+                opts = {
+                    current: this._currentPage,
+                    enablePrev: (this._currentPage !== 0),
+                    enableNext: (this._currentPage !== this._pageCount - 1),
+                    pages: pages,
+                    firstText: this.options.firstText,
+                    nextText: this.options.nextText,
+                    prevText: this.options.prevText,
+                    lastText: this.options.lastText,
+                    placeholderText: this.options.placeholderText,
+                    showFirstLast: this.options.showFirstLastButtons
+                };
+                this.$el.html(this.templates.body(opts));
+
+                return this;
+            },
+
+
+            _isRendered: function() {
+                return this.$('.uxf-pager').length > 0;
+            },
+
+
+            _firstPage: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!this._isDisabled(e)) {
+                    this.setCurrentPage(0);
+                }
+            },
+
+
+            _previousPage: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!this._isDisabled(e)) {
+                    this.setCurrentPage(this._currentPage - 1);
+                }
+            },
+
+
+            _nextPage: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!this._isDisabled(e)) {
+                    this.setCurrentPage(this._currentPage + 1);
+                }
+            },
+
+
+            _lastPage: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!this._isDisabled(e)) {
+                    this.setCurrentPage(this._pageCount - 1);
+                }
+            },
+
+
+            _selectPage: function(e) {
+                var page;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!this._isDisabled(e)) {
+                    page = $(e.currentTarget).data('page');
+                    this.setCurrentPage(page);
+                }
+            },
+
+
+            _isDisabled: function(e) {
+                var el = $(e.currentTarget);
+
+                return el.hasClass('uxf-disabled');
+            }
+        });
+
+
+        /**
+         * Helper function for pages.  Calculate the # of pages necessary to display a result.
+         * ie.  Given a page size of 10 items and 74 items, will calculate that you need 8 pages.
+         *
+         * @param pages
+         * @param blockSize
+         * @returns {number}
+         */
+        Pager.calculatePages = function(pages, blockSize) {
+            return Math.floor((pages - 1) / blockSize) + 1;
+        };
+
+
+        /**
+         * Expose the default paging strategy
+         * @type {Function}
+         */
+        Pager.limitPagedStrategyFactory = limitPagedStrategyFactory;
+
+
+        Pager.newInstance = function(parent, opts) {
+            return new Pager(parent, opts);
+        };
+
+        return Pager;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * quicklinksview.js
+ */
+
+/*global UXF,navigator */
+
+/**
+ * Quicklinks view.
+ *
+ * This component renders a list of OLE style quicklinks.   Each link should be
+ * configured with a label (i18n key), a classname (OLE uses this to decide which
+ * button is displayed next to the link so it needs to be overridable) and an
+ * event name.  The event name is the name of the event this component will fire.
+ * That just enables you to bind listeners to the quicklinks objects and listen
+ * for backbone events (which are for internal usage only!).
+ *
+ * Options:
+ * - links: array of link configs.   Each link should contain:
+ *  - label: the i18n key to use for looking up the text of the link
+ *  - className:  the class name of to use on the link
+ *  - event:  The event identifier for the event that will get fired when a
+ *          link is clicked.
+ * - alt:  Add the alt class to the quicklinks container.
+ */
+UXF.Module.define({
+    name: 'UXF.Common.QuickLinksView',
+    initArgs: [
+        'jQuery',
+        '_',
+        'UXF.Common.AbstractView',
+        'UXF.Common.Classes',
+        'UXF.Common.Templates',
+        'UXF.Common.BrowserUtils'
+    ],
+    initFunc: function($, _, AbstractView, Classes, Templates, browserUtils) {
+        "use strict";
+
+
+        var View;
+
+
+        View = AbstractView.extend({
+            options: {
+                links: [],
+                alt: false
+            },
+            templates: {
+                body: Templates.quicklinks
+            },
+            events: {
+                'click .uxf-quicklink': '_handleClick'
+            },
+            classes: Classes.quickLinks,
+            selectors: {
+                links: '.uxf-quicklink',
+                quickLinks: 'quickLinks',
+                icon: 'i'
+            },
+
+
+            initialize: function() {
+                if(!this.options.links && this.options.links.length === 0){
+                    throw 'No links provided';
+                }
+            },
+
+
+            render: function() {
+                this.$el.empty();
+                this.$el.html(this.templates.body({
+                    links: this.options.links,
+                    alt: this.options.alt
+                }));
+
+                return this;
+            },
+
+
+            _handleClick: function(event) {
+                // Commenting out this event propagation so that Print menu goes away when user clicks a link.
+                //    event.stopPropagation();
+                //    event.preventDefault();
+
+                var eventId = $(event.currentTarget).data('eventId'),
+                    $element = null,
+                    $this = $(event.currentTarget);
+                    if ($this.find('a').is('.disabled, :disabled')) {
+                        return;
+                    }
+
+                this.trigger(eventId, event.currentTarget, event);
+            }
+        });
+
+
+        View.newInstance = function(parent, opts) {
+            return new View(parent, opts);
+        };
+
+        return View;
+    }
+});
+
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * tabbedview.js
+ */
+/*global UXF */
+
+/**
+ * Define a simple tab bar.   This is configured by passing in a "tabs" object.
+ * The tabs should be an array of objects in the form:
+ * {
+ *  label: i18nLabel,
+ *  view: instantiatedView
+ * }
+ *
+ *
+ * Examples:
+ * var view = TabbedView.newInstance(null, {
+ *     tabs: [{
+ *          label: 'assessment-builder.questions.edit',
+ *          view: QuestionCollection.newInstance(...)
+ *      }, {
+ *          label: 'assessment-builder.questions.reorder',
+ *          view: QuestionOrder.newInstance(...)
+ *      }
+ *  ]);
+ */
+UXF.Module.define({
+    name: 'UXF.Common.TabbedView',
+    initArgs: ['jQuery', '_', 'UXF.Common.AbstractView', 'debug'],
+    initFunc: function($, _, AbstractView, debug) {
+        "use strict";
+
+        var View, TabsMenuView, TemplateTabsMenu, TemplateBody;
+
+        TemplateTabsMenu = [
+            '<ul class="<%= classes.tabbar %>">',
+                '<% for (var i = 0; i < tabs.length; i++) { %>',
+                    '<li class="<%= classes.tab %> <% if (i === currentIdx) { print(classes.selected); } %>" data-index="<%= i %>">',
+                        '<%__ tabs[i].label %>',
+                    '</li>',
+                '<% } %>',
+            '</ul>'
+        ].join('');
+
+        TemplateBody = [
+                '<div class="<%= classes.content %>">',
+                '</div>'
+        ].join('');
+
+        TabsMenuView = AbstractView.extend({
+            templates: {
+                tabsMenu: TemplateTabsMenu
+            },
+            events: {
+                'click .uxf-tabbar-tab': '_switchTabs'
+            },
+            classes: {
+                tabbar: 'uxf-tabbar',
+                tab: 'uxf-tabbar-tab',
+                selected: 'uxf-tabbar-selected'
+            },
+
+
+            render: function(options) {
+                this.options = options;
+                var content;
+                content = this.templates.tabsMenu({currentIdx: options.currentIdx, tabs: options.tabs});
+                this.$el.html(content);
+
+                if (options.title !== false) {
+                    this.$el.append(options.title);
+                }
+
+                return this;
+            },
+
+
+            _switchTabs: function(event) {
+                event.stopPropagation();
+                event.preventDefault();
+
+                var idx = $(event.currentTarget).data('index');
+                // no index, or a bad index found...  ignore the event.
+                if (idx === null || idx === undefined || !this.options.tabs[idx]) {
+                    debug.error('invalid tab id: ', idx);
+                    return;
+                }
+
+                if (idx === this.options.currentIdx) {
+                    return;
+                }
+
+                this.options.parent.currentTabIndex = idx;
+                this.options.parent.render();
+            }
+        });
+
+
+        View = AbstractView.extend({
+            options: {
+                tabsMenuEl: false,
+                title: false,
+                tabs: [],
+                showTabs: true
+            },
+            classes: {
+                content: 'uxf-tabbar-content',
+                tabbar: 'uxf-tabbar',
+                tab: 'uxf-tabbar-tab',
+                selected: 'uxf-tabbar-selected'
+            },
+            selectors: {
+                content: 'content'
+            },
+            templates: {
+                tabsContent: TemplateBody
+            },
+            currentTabIndex: 0,
+            initialize: function(options) {
+                if (!this.options.tabs || this.options.tabs.length === 0) {
+                    throw 'No tabs specified';
+                }
+            },
+
+
+            switchTabs: function(label) {
+                var idx = -1;
+                _.each(this.options.tabs, function(tab, i) {
+                    if (tab.label === label) {
+                        idx = i;
+                    }
+                }, this);
+
+
+                // if key is found and it's a different tab, update and re-render...
+                if (idx > -1 && idx !== this.currentTabIndex) {
+                    this.currentTabIndex = idx;
+                    this.render();
+                }
+            },
+
+
+            setTabsMenuEl: function(tabsMenuEl, title)
+            {
+                this.options.tabsMenuEl = tabsMenuEl;
+                this.options.title = title;
+            },
+
+
+            render: function() {
+
+                var content, tabsMenu, tabsContent;
+
+                this.$el.empty();
+
+                if (this.options.showTabs) {
+                    tabsMenu = new TabsMenuView();
+                    tabsMenu.setElement(this.options.tabsMenuEl || this.el);
+                    tabsMenu.render({parent: this, currentIdx: this.currentTabIndex, tabs: this.options.tabs, title: this.options.title});
+                }
+                tabsContent = this.templates.tabsContent({
+                    currentIdx: this.currentTabIndex,
+                    tabs : this.options.tabs
+                });
+
+                this.$el.append(tabsContent);
+
+                content = this._getContentView();
+
+                if (content) {
+                    content.setElement(this.locate('content'));
+                    content.render();
+                }
+
+                return this;
+            },
+
+
+            _getContentView: function() {
+                var tab = this.options.tabs[this.currentTabIndex] || this.options.tabs[0];
+                return tab.view;
+            }
+        });
+
+
+        View.newInstance = function(parent, opts) {
+            return new View(parent, opts);
+        };
+
+        return View;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * util.js
+ */
+
+/*global UXF */
+
+/**
+ * module for various polyfills and other global utils
+ */
+UXF.Module.define({
+    name: 'UXF.Common.Util',
+    initArgs: [],
+    initFunc: function() {
+        "use strict";
+
+        if(!String.prototype.trim) {
+            String.prototype.trim = function() {
+                return this.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+            };
+
+            String.prototype.ltrim = function() {
+                return this.replace(/^\s+/,'');
+            };
+
+            String.prototype.rtrim = function() {
+                return this.replace(/\s+$/,'');
+            };
+
+            String.prototype.fulltrim = function() {
+                return this.replace(/(?:(?:^|\n)\s+|\s+(?:$|\n))/g,'').replace(/\s+/g,' ');
+            };
+        }
+
+        if(!String.prototype.repeat) {
+            String.prototype.repeat = function (num) {
+                var a = [];
+                a.length = parseInt(num, 10) + 1;
+                return a.join(this);
+            };
+        }
+
+        if(!String.prototype.pad) {
+            String.prototype.pad = function(padString, leftCount, rightCount) {
+                return padString.repeat(leftCount) + this + padString.repeat(rightCount);
+            };
+        }
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * window-event-proxy.js
+ */
+
+/*global jQuery, UXF */
+
+/**
+ * module for proxy methods for window alert and confirm events
+ */
+UXF.Module.define({
+    name: 'UXF.Common.WindowEventProxy',
+    initArgs: ['jQuery', 'window'],
+    initFunc: function($, proxy) {
+        "use strict";
+
+        var customAlerts = [], customConfirms = [], alertHandleKeys = [], confirmHandleKeys = [],
+
+        windowProxy = {
+
+            registerCustomAlert : function (handleKey, useAlert, alertImpl, thisObj) {
+                if($.inArray(handleKey, alertHandleKeys) === -1) {
+                    alertHandleKeys.push(handleKey);
+                    customAlerts.push({useCustomAlert: useAlert, customAlertImpl: alertImpl, targetObj: thisObj});
+                }
+            },
+
+            registerCustomConfirm : function (handleKey, useConfirm, confirmImpl) {
+                if($.inArray(handleKey, confirmHandleKeys) === -1) {
+                    confirmHandleKeys.push(handleKey);
+                    customConfirms.push({useCustomConfirm: useConfirm, customConfirmImpl: confirmImpl});
+                }
+            } 
+
+        };
+
+       (function() {
+            var i, nalert = proxy.alert, nconfirm = proxy.confirm; 
+
+            proxy.alert = function (message) {
+                for (i = 0; i < customAlerts.length; i++) {
+                    if (customAlerts[i].useCustomAlert(message)) {
+                        customAlerts[i].customAlertImpl(message, customAlerts[i].targetObj);
+                        return;
+                    }
+                }
+                nalert(message);
+            };
+
+            proxy.confirm = function (message) {
+                for (i = 0; i < customConfirms.length; i++) {
+                    if (customConfirms[i].useCustomConfirm(message)) {
+                        customConfirms[i].customConfirmImpl(message);
+                        return;
+                    }
+                }
+                nconfirm(message);
+            };
+
+        }());
+
+        return windowProxy;
+    }
+
+});;UXF.Module.define({
+    name: 'UXF.Common.Templates',
+    initArgs: [],
+    initFunc: function() {
+        "use strict";
+
+        var templates = {};
+
+                templates["button"] = "<a href=\"<%= href %>\" <% if (target) { print('target=' + target) } %> tabindex=\"0\"><span class=\"uxf-button-label\"><%- label %></span></a><% if (iconClass) { %><span class=\"uxf-button-icon <%- iconClass %>\"><span><%= iconValue %></span></span><% } %>";
+                templates["pager"] = "<div class='uxf-pager'><ul><% if (showFirstLast) { %><li class='uxf-pager-first uxf-pager-button <%= (enablePrev) ? \"\" : \"uxf-disabled\" %>'><%- firstText %></li><% } %><li class='uxf-pager-prev uxf-pager-button <%= (enablePrev) ? \"\" : \"uxf-disabled\" %>'><%- prevText %></li><% _.each(pages, function(page) { %><li class='uxf-pager-page uxf-pager-button <%= (page === current) ? \"uxf-pager-current\" : \"\" %>' data-page='<%- page %>'><%= page + 1 %></li><% }) %><li class='uxf-pager-next uxf-pager-button <%= (enableNext) ? \"\" : \"uxf-disabled\" %>'><%- nextText %></li><% if (showFirstLast) { %><li class='uxf-pager-last uxf-pager-button <%- (enableNext) ? \"\" : \"uxf-disabled\" %>'><%- lastText %></li><% } %></ul></div>";
+                templates["quicklinks"] = "<div class=\"<%= classes.quickLinks %><%= ' ' %><% if (alt) { print(classes.alt); } %>\"><% for (var i = 0; i < links.length; i++) { %><span class=\"uxf-quicklink <% if (links[i].buttonClass) { print(links[i].buttonClass); } %>\" data-event-id=\"<%= links[i].event %>\"><a href=\"javascript://\" <% if( links[i].anchorClass ) { print(' class=\"' + links[i].anchorClass + '\"'); } %>><i class=\"<%= links[i].className %>\"></i><span><%__ links[i].label %></span></a></span><% } %></div>";
+        
+        return templates;
+    }
+});
+;/*
+ * Copyright 2012, Pearson Education, Learning Technology Group
+ *
+ * uxflib-package.js
+ */
+
+/*global UXF: true */
+
+(function() {
+    "use strict";
+
+    UXF.Module.loadAll([
+        'UXF.Common.Templates',
+        'UXF.Common.Util',
+        'UXF.Common.EventBus',
+        'UXF.Common.i18n',
+        'UXF.Common.BrowserUtils',
+        'UXF.Common.ConfigFactory',
+        'UXF.Common.BackboneExtensions',
+        'UXF.Common.AbstractView',
+        'UXF.Common.CollectionView',
+        'UXF.Common.Classes',
+        'UXF.Common.ButtonView',
+        'UXF.Common.ButtonGroupView',
+        'UXF.Common.TabbedView',
+        'UXF.Common.QuickLinksView',
+        'UXF.Common.NotificationWidget',
+        'UXF.Common.WindowEventProxy',
+        'UXF.Common.PagerView',
+        'UXF.AudioPlayer.Widget.AudioPlayer'
+     ]);
+} ());

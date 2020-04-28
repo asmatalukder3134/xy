@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<!-- saved from url=(0295)https://www.pearsonrealize.com/community/classes/0aafddd0d37c48388debc4895721a80f/assignments/b3f5d242a4894ae1826280bb4f3c055e/content/6791a013-2f23-34a8-a67e-31ffa01b5e4a/8/assignmentUserId/7542839e3f2f4e4db9e3a2fa776e7483?ticket=ST-301186-0RzjUol0coPSSeA0fy3F-prod-cas-caschart-9c7d59555-76wq5 -->
+<html lang="en" class="js flexbox flexboxlegacy canvas canvastext webgl no-touch geolocation postmessage websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers applicationcache svg inlinesvg smil svgclippaths wf-cabinbold-n4-active wf-cabinitalic-n4-active wf-cabinregular-n4-active wf-cabinsemibold-n4-active wf-cabinsemibolditalic-n4-active wf-museoslab500italic-n4-active wf-museoslab500regular-n4-active wf-museoslab700regular-n4-active wf-avenir-n4-active wf-active plt-desktop md contentViewer" mode="md"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><style type="text/css">@charset "UTF-8";[ng\:cloak],[ng-cloak],[data-ng-cloak],[x-ng-cloak],.ng-cloak,.x-ng-cloak,.ng-hide:not(.ng-hide-animate){display:none !important;}ng\:form{display:block;}.ng-animate-shim{visibility:hidden;}.ng-anchor{position:absolute;}</style>
+        <title>Pearson Realize</title>
+        <style data-styles="">ion-action-sheet,ion-action-sheet-controller,ion-alert,ion-alert-controller,ion-anchor,ion-app,ion-avatar,ion-back-button,ion-backdrop,ion-badge,ion-button,ion-buttons,ion-card,ion-card-content,ion-card-header,ion-card-subtitle,ion-card-title,ion-checkbox,ion-chip,ion-col,ion-content,ion-datetime,ion-fab,ion-fab-button,ion-fab-list,ion-footer,ion-grid,ion-header,ion-icon,ion-img,ion-infinite-scroll,ion-infinite-scroll-content,ion-input,ion-item,ion-item-divider,ion-item-group,ion-item-option,ion-item-options,ion-item-sliding,ion-label,ion-list,ion-list-header,ion-loading,ion-loading-controller,ion-menu,ion-menu-button,ion-menu-controller,ion-menu-toggle,ion-modal,ion-modal-controller,ion-nav,ion-nav-pop,ion-nav-push,ion-nav-set-root,ion-note,ion-picker,ion-picker-column,ion-picker-controller,ion-popover,ion-popover-controller,ion-progress-bar,ion-radio,ion-radio-group,ion-range,ion-refresher,ion-refresher-content,ion-reorder,ion-reorder-group,ion-ripple-effect,ion-route,ion-route-redirect,ion-router,ion-router-outlet,ion-row,ion-searchbar,ion-segment,ion-segment-button,ion-select,ion-select-option,ion-select-popover,ion-skeleton-text,ion-slide,ion-slides,ion-spinner,ion-split-pane,ion-tab,ion-tab-bar,ion-tab-button,ion-tabs,ion-text,ion-textarea,ion-thumbnail,ion-title,ion-toast,ion-toast-controller,ion-toggle,ion-toolbar,ion-virtual-scroll{visibility:hidden}.hydrated{visibility:inherit}</style>
+
+        <!-- Use the .htaccess and remove these lines to avoid edge case issues.
+             More info: h5bp.com/i/378 -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+        <!-- Mobile viewport optimized: h5bp.com/viewport -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1.0, user-scalable=no">
+
+        <!-- favicons -->
+        <!-- TODO: These should get moved to pre-login and be located in the root -->
+        <link rel="apple-touch-icon" href="https://www.pearsonrealize.com/community/realizeit/favicon/touch-icon-iphone.png">
+        <link rel="apple-touch-icon" sizes="76x76" href="https://www.pearsonrealize.com/community/realizeit/favicon/touch-icon-ipad.png">
+        <link rel="apple-touch-icon" sizes="120x120" href="https://www.pearsonrealize.com/community/realizeit/favicon/touch-icon-iphone@2x.png">
+        <link rel="apple-touch-icon" sizes="152x152" href="https://www.pearsonrealize.com/community/realizeit/favicon/touch-icon-ipad@2x.png">
+        <link rel="icon" href="https://www.pearsonrealize.com/community/realizeit/favicon/favicon.png">
+        <link rel="shortcut icon" href="https://www.pearsonrealize.com/community/realizeit/favicon/favicon.ico" type="image/x-icon">
+        <meta name="msapplication-TileColor" content="#004168">
+        <meta name="msapplication-TileImage" content="/community/realizeit/favicon/tileicon.png">
+
+        <!-- RGHT-53766: moved csrfToken from index_globalScript.jsp to main/index page
+            also changed the scope of token from application to session
+            this keeps it sync with backend csrf token changes -->
+        <script src="./suha_files/cb=gapi.loaded_3" async=""></script><script src="./suha_files/cb=gapi.loaded_2" async=""></script><script src="./suha_files/cb=gapi.loaded_1" async=""></script><script src="./suha_files/cb=gapi.loaded_0" async=""></script><script>
+            csrfToken = 'ffffffff5e7ff83b620ae8df9-50a7-4c2';
+        </script>
+
+        <script type="text/javascript">
+    // globals passed from Java
+    rootPath = '/community';
+    restPath = '/community/rest';
+    mediaPath = '/community/realizeit';
+    componentArchitectureDist='/community/realizeit/componentArchitecture/dist';
+    thumbnailPath = '/community/thumbnails';
+    systemLang = 'en';
+    //acceptLang = 'en-US,en;q=0.9';
+    jsLogLevel = 3;
+    googleAnalyticsId = 'UA-40456310-6';
+    
+    contineoServerUrl='https://cms.easybridge.rbsapi.com';
+    contineoCatUrl='https://cat.easybridge.pk12ls.com';
+    contineoServerHelpUrl='http://help.pearsoncmg.com/easybridge/prod/EB_Auto/Teacher/index.htm';
+    nbcLearnRssId='F38471FC0DC98649E040170A01267D9B';
+    discussionApiUrl = 'https://api.pearsonrealize.com/discussion/api/v2';
+    if (discussionApiUrl.indexOf('http') === -1 && discussionApiUrl.indexOf(rootPath) === -1) {
+        discussionApiUrl = rootPath + discussionApiUrl;
+    }
+    contentApiUrl = 'http://content-service.pearsonrealize.com/content-service';
+    realizeNotebookIntegrationEnabled = 'true';
+    notebookServiceUrl = 'https://api.pearsonrealize.com/notebook';
+    toggleSubmitAndContinueButton = 'true';
+    teacherHelpUrl = 'https://help.learningservicestechnology.com/realize/en/Instructor/Help.htm';
+    studentHelpUrl = 'https://help.learningservicestechnology.com/realize/en/Student/Help.htm';
+    trainingLinkUrl = 'https://mypearsontraining.com/login';
+    technicalsupportLinkUrl = 'https://pearsonnacommunity.force.com/support/s/contactsupport';
+    contactProgramSpecialistLinkUrl = 'https://mypearsontraining.com/chat/index';
+    newFeaturesUrl = 'https://help.learningservicestechnology.com/realize/en/Announcements/Help.htm';
+    forgotPasswordUrl = 'https://sso.rumba.pk12ls.com/sso/forgot';
+    testNavPreviewApiUrl = 'http://tn8.pearsonrealize.com';
+    intercomEnabled = 'true';
+    intercomAppId = 'r76r7yxf';
+    realizeReaderAppName = 'etext2';
+    googleClientId = '579264633337-rflct4um273iqsnlketlc97rs1krp24e.apps.googleusercontent.com';
+    oneDriveAppId = 'd74cb534-4b84-4e1e-9bdb-77a6cc5368db';
+    googleClassroomHelpUrlInstructor = 'https://help.learningservicestechnology.com/realize/en/Instructor/Content/Instructor/Classes/google_classroom.htm';
+    googleClassroomRedirectUrl = '/community/redirect/classroom';
+    googleDocContextualHelpTeacherId = 'instructor_0a1a7ebd800446fbb13375337add0319';
+    googleDocContextualHelpStudentId = 'student_8d1db2c2d695b3db9b660c4cc083577f';
+    googleDocBaseUrl = 'https://docs.google.com/document/d';
+    classSyncWebAppUrl = 'https://class-sync.pearsonrealize.com';
+    classSyncServiceUrl = 'https://class-sync-service.pearsonrealize.com';
+    classSyncPollInterval = '5000';
+    realizeTelemetryKey = 'fBmWWjjKP966hKXaBFxi28v5qedNZMw26UZb6GOb';
+    realizeTelemetryUrl = 'https://api.k12rsdev.com/realize-telemetry/realize';
+    realizeTelemetryEnvironmentName = 'Prod';
+    rubricServiceBaseUrl = 'https://rubric-service.pearsonrealize.com';
+    ltiServiceBaseUrl = 'http://lti-service-smoke.us-east-1.elasticbeanstalk.com/lti-service';
+    ltiServiceWebAdminUrl = 'https://lti-web.pearsonrealize.com/tool/admin.html';
+    ltiServiceWebToolLaunchUrl = 'https://lti-web.pearsonrealize.com/tool/launch.html';
+
+    heartbeatLoginEventUrl = 'https://api.pearsonrealize.com/heartbeat/heartbeat/events/login';
+    heartbeatCloseContentEventUrl = 'https://api.pearsonrealize.com/heartbeat/heartbeat/events/contentclose';
+    heartbeatOpenContentEventUrl = 'https://api.pearsonrealize.com/heartbeat/heartbeat/events/contentopen';
+    heartbeatEventUrl = 'https://api.pearsonrealize.com/heartbeat/heartbeat/events/heartbeat';
+    heartbeatPulseIntervalInMillis = 300000;
+    itemAnalysisV2Enabled = true;
+    realizeReaderEnabled = false;
+    nativeBuildNumber = '7e128d2';
+    
+        
+        heartbeatFeatureEnabled = true;
+    
+
+    params =
+        {"ticket":"ST-301186-0RzjUol0coPSSeA0fy3F-prod-cas-caschart-9c7d59555-76wq5"};
+
+    currentUser =
+        {"userId":"ffffffff5e7ff83b601f5600328a3a80","googleConsentProvided":"true","userName":"shamamas@nycstudents.net","firstName":"SHAMAMA","lastName":"SUHA","gender":"Unspecified","rumbaEmail":"shamamas@nycstudents.net","roles":["ROLE_AUTHENTICATED","ROLE_STUDENT"],"featureAttributes":{"show.google.classroom.integration":"ON"},"userAttributes":{"profile.avatar":"15_student","home.background":"teacher9","programs.tocView":"thumbnail","profile.wizard":"complete","programs.visited":"true","profile.locale":"en","created_datetime":"2020-03-30 17:42:37","updated_datetime":"2020-04-05 16:47:56","platform":"realize","profile.title":"","profile.firstName":"SHAMAMA","profile.middleName":"","profile.lastName":"SUHA","profile.gender":"Unspecified","profile.email":"shamamas@nycstudents.net","profile.isAdmin":"false","googleImportedUser":"true","hasCenter":"false","hasLeveledReader":"true","vistedLandingPage":"false","lrsEventServiceToggleStateAttr":"true","prevLoginTime":"2020-04-07T02:04:48.240Z","currLoginTime":"2020-04-07T02:11:03.645Z","userDomain":"native"},"primaryOrgRole":"Student","primaryOrgId":"8a97b09a473a6d0e01473b343c9b0304","availableCourses":["Connected Mathematics 3 Grade 6 2018","Connected Mathematics 3 Grade 7 2018","Connected Mathematics 3 Grade 8 2018","Connected Mathematics 3 Grade 8 Algebra 1 2018","Investigations 3 Common Core Grade 2 2017","ReadyGEN 2016 Common Core Grade 1","ReadyGEN 2016 Common Core Grade 2","ReadyGEN 2016 Common Core Grade 3","ReadyGEN 2016 Common Core Grade 4","ReadyGEN 2016 Common Core Grade 5","ReadyGEN 2016 Common Core Grade K","ReadyGEN 2016 Grade 1","ReadyGEN 2016 Grade 2","ReadyGEN 2016 Grade 3","ReadyGEN 2016 Grade 4","ReadyGEN 2016 Grade 5","ReadyGEN 2016 Grade 6","ReadyGEN 2016 Grade K","ReadyGEN Grade 1","ReadyGEN Grade 2","ReadyGEN Grade 3","ReadyGEN Grade 4","ReadyGEN Grade 5","ReadyGEN Grade K","Words Their Way Classroom 2019","enVisionmath2.0 Common Core Grade 1 2016","enVisionmath2.0 Common Core Grade 2 2016","enVisionmath2.0 Common Core Grade 3 2016","enVisionmath2.0 Common Core Grade 4 2016","enVisionmath2.0 Common Core Grade 5 2016","enVisionmath2.0 Common Core Grade 6 2016","enVisionmath2.0 Common Core Grade K 2016","enVisionmath2.0 Common Core en español Grade 1 2016","enVisionmath2.0 Common Core en español Grade 2 2016","enVisionmath2.0 Common Core en español Grade 3 2016","enVisionmath2.0 Common Core en español Grade 4 2016","enVisionmath2.0 Common Core en español Grade 5 2016","enVisionmath2.0 Common Core en español Grade K 2016","enVisionmath2.0 Custom Grade 1","enVisionmath2.0 Custom Grade 2","enVisionmath2.0 Custom Grade 3","enVisionmath2.0 Custom Grade 4","enVisionmath2.0 Custom Grade 5","enVisionmath2.0 Custom Grade K","enVisionmath2.0 Grade 1 2017","enVisionmath2.0 Grade 2 2017","enVisionmath2.0 Grade 3 2017","enVisionmath2.0 Grade 4 2017","enVisionmath2.0 Grade 5 2017","enVisionmath2.0 Grade K 2017","enVisionmath2.0 Grades 6-8 Grade 6 2017","enVisionmath2.0 Grades 6-8 Grade 7 2017","enVisionmath2.0 Grades 6-8 Grade 8 2017"],"subscribedCourses":["ReadyGEN Grade 4","Words Their Way Classroom 2019"],"affiliations":[{"affiliationId":"25377db9b517485e86cb7ff4d8863591","orgRole":"S","organizationId":"8a97b09a473a6d0e01473b343c9b0304","affiliationStatus":"Confirmed"}],"oleAffiliations":[{"organizationId":"8a97b09a473a6d0e01473b343c9b0304","products":[{"productId":"58729","productName":"ReadyGEN Grade 1","subscribed":false,"hasResources":false},{"productId":"102188","productName":"ReadyGEN 2016 Common Core Grade 1","subscribed":false,"hasResources":false},{"productId":"58730","productName":"ReadyGEN Grade 2","subscribed":false,"hasResources":false},{"productId":"102189","productName":"ReadyGEN 2016 Common Core Grade 2","subscribed":false,"hasResources":false},{"productId":"102140","productName":"ReadyGEN 2016 Common Core Grade K","subscribed":false,"hasResources":false},{"productId":"58748","productName":"ReadyGEN Grade 3","subscribed":false,"hasResources":false},{"productId":"102190","productName":"ReadyGEN 2016 Common Core Grade 3","subscribed":false,"hasResources":false},{"productId":"102171","productName":"ReadyGEN 2016 Common Core Grade 4","subscribed":false,"hasResources":false},{"productId":"58749","productName":"ReadyGEN Grade 4","subscribed":true,"hasResources":false},{"productId":"177207","productName":"Connected Mathematics 3 Grade 7 2018","subscribed":false,"hasResources":false},{"productId":"177237","productName":"Connected Mathematics 3 Grade 6 2018","subscribed":false,"hasResources":false},{"productId":"177238","productName":"Connected Mathematics 3 Grade 8 Algebra 1 2018","subscribed":false,"hasResources":false},{"productId":"177252","productName":"Connected Mathematics 3 Grade 8 2018","subscribed":false,"hasResources":false},{"productId":"105812","productName":"Investigations 3 Common Core Grade 2 2017","subscribed":false,"hasResources":false},{"productId":"222173","productName":"Words Their Way Classroom 2019","subscribed":true,"hasResources":false},{"productId":"58731","productName":"ReadyGEN Grade 5","subscribed":false,"hasResources":false},{"productId":"58728","productName":"ReadyGEN Grade K","subscribed":false,"hasResources":false},{"productId":"102172","productName":"ReadyGEN 2016 Common Core Grade 5","subscribed":false,"hasResources":false},{"productId":"97448","productName":"enVisionmath2.0 Common Core Grade 2 2016","subscribed":false,"hasResources":false},{"productId":"97450","productName":"enVisionmath2.0 Common Core Grade 4 2016","subscribed":false,"hasResources":false},{"productId":"97430","productName":"enVisionmath2.0 Common Core Grade 5 2016","subscribed":false,"hasResources":false},{"productId":"97429","productName":"enVisionmath2.0 Common Core Grade 1 2016","subscribed":false,"hasResources":false},{"productId":"97411","productName":"enVisionmath2.0 Common Core Grade 6 2016","subscribed":false,"hasResources":false},{"productId":"134293","productName":"enVisionmath2.0 Grade 2 2017","subscribed":false,"hasResources":false},{"productId":"134312","productName":"enVisionmath2.0 Grade 3 2017","subscribed":false,"hasResources":false},{"productId":"134313","productName":"enVisionmath2.0 Grade 4 2017","subscribed":false,"hasResources":false},{"productId":"134314","productName":"enVisionmath2.0 Grade 5 2017","subscribed":false,"hasResources":false},{"productId":"134292","productName":"enVisionmath2.0 Grade 1 2017","subscribed":false,"hasResources":false},{"productId":"97449","productName":"enVisionmath2.0 Common Core Grade 3 2016","subscribed":false,"hasResources":false},{"productId":"97428","productName":"enVisionmath2.0 Common Core Grade K 2016","subscribed":false,"hasResources":false},{"productId":"134272","productName":"enVisionmath2.0 Grade K 2017","subscribed":false,"hasResources":false},{"productId":"137142","productName":"enVisionmath2.0 Grades 6-8 Grade 6 2017","subscribed":false,"hasResources":false},{"productId":"137767","productName":"enVisionmath2.0 Grades 6-8 Grade 8 2017","subscribed":false,"hasResources":false},{"productId":"137750","productName":"enVisionmath2.0 Grades 6-8 Grade 7 2017","subscribed":false,"hasResources":false},{"productId":"205633","productName":"enVisionmath2.0 Custom Grade K","subscribed":false,"hasResources":false},{"productId":"205656","productName":"enVisionmath2.0 Custom Grade 5","subscribed":false,"hasResources":false},{"productId":"205655","productName":"enVisionmath2.0 Custom Grade 4","subscribed":false,"hasResources":false},{"productId":"205673","productName":"enVisionmath2.0 Custom Grade 3","subscribed":false,"hasResources":false},{"productId":"124677","productName":"ReadyGEN 2016 Grade 1","subscribed":false,"hasResources":false},{"productId":"124656","productName":"ReadyGEN 2016 Grade 2","subscribed":false,"hasResources":false},{"productId":"124657","productName":"ReadyGEN 2016 Grade 3","subscribed":false,"hasResources":false},{"productId":"124658","productName":"ReadyGEN 2016 Grade 4","subscribed":false,"hasResources":false},{"productId":"124659","productName":"ReadyGEN 2016 Grade 5","subscribed":false,"hasResources":false},{"productId":"138592","productName":"ReadyGEN 2016 Grade 6","subscribed":false,"hasResources":false},{"productId":"124552","productName":"ReadyGEN 2016 Grade K","subscribed":false,"hasResources":false},{"productId":"122223","productName":"enVisionmath2.0 Common Core en español Grade K 2016","subscribed":false,"hasResources":false},{"productId":"122224","productName":"enVisionmath2.0 Common Core en español Grade 1 2016","subscribed":false,"hasResources":false},{"productId":"122214","productName":"enVisionmath2.0 Common Core en español Grade 2 2016","subscribed":false,"hasResources":false},{"productId":"122225","productName":"enVisionmath2.0 Common Core en español Grade 3 2016","subscribed":false,"hasResources":false},{"productId":"122226","productName":"enVisionmath2.0 Common Core en español Grade 4 2016","subscribed":false,"hasResources":false},{"productId":"122238","productName":"enVisionmath2.0 Common Core en español Grade 5 2016","subscribed":false,"hasResources":false},{"productId":"205653","productName":"enVisionmath2.0 Custom Grade 1","subscribed":false,"hasResources":false},{"productId":"205654","productName":"enVisionmath2.0 Custom Grade 2","subscribed":false,"hasResources":false}]}]};
+
+    servicesState =
+        {"k12rsApiGatewayEnabled":"","EXTERNAL_QUESTION_ENABLED":"true","ESSAY_PROMPT_ENABLED_PROGRAMS":"myPerspectives ELA California Grade 9|myPerspectives ELA California Grade 10|myPerspectives ELA California Grade 11|myPerspectives ELA California Grade 12|myPerspectives ELA National Grade 6|myPerspectives ELA National Grade 7|myPerspectives ELA National Grade 8|myPerspectives ELA National Grade 9|myPerspectives ELA National Grade 10|myPerspectives ELA National Grade 11|myPerspectives ELA National Grade 12|myPerspectives Plus ELA Grades 6-12|Pearson Common Core Literature Grade 6|Pearson Common Core Literature Grade 7|Pearson Common Core Literature Grade 8|Pearson Common Core Literature Grade 9|Pearson Common Core Literature Grade 10|Pearson Common Core Literature Grade 11|Pearson Common Core Literature Grade 12|Pearson Literature Grade 6|Pearson Literature Grade 7|Pearson Literature Grade 8|Pearson Literature Grade 9|Pearson Literature Grade 10|Pearson Literature Grade 11|Pearson Literature Grade 12|Prentice Hall Writing Coach National, Grade 6|Prentice Hall Writing Coach National, Grade 7|Prentice Hall Writing Coach National, Grade 8|Prentice Hall Writing Coach National, Grade 9|Prentice Hall Writing Coach National, Grade 10|Prentice Hall Writing Coach National, Grade 11|Prentice Hall Writing Coach National, Grade 12|Prentice Hall Writing Coach Texas, Grade 6|Prentice Hall Writing Coach Texas, Grade 7|Prentice Hall Writing Coach Texas, Grade 8|Prentice Hall Writing Coach Texas, Grade 9|Prentice Hall Writing Coach Texas, Grade 10|Prentice Hall Writing Coach Texas, Grade 11|Prentice Hall Writing Coach Texas, Grade 12|Pearson Literature EssayScorer 2015 Grades 6-12|myPerspectives ELA Texas Grade 6|myPerspectives ELA Texas Grade 7|myPerspectives ELA Texas Grade 8|myPerspectives ELA Texas Grade 6 TX|myPerspectives ELA Texas Grade 7 TX|myPerspectives ELA Texas Grade 8 TX","heartbeat.feature.enabled":"true","comments.feature.enabled":"true","discussions.enabled":"true","k12rs.event.tracker.table.name":"prod_realize_webapp_event-tracker-2019","throttleMaxQueueLength":"100","throttleConcurrentLimit":"2","discussions":"true","dctm.content.checksum.enable":"false","PERSISTING_ADAPTIVE_EVENTS":"true","k12rs.events.enabled":"true","toggleSubmitAndContinueButton":"true","STATE_SPECIFIC_CONTENT_PROCESS_ENABLE":"true","throttleWaitTimeout":"30","dctm.thumbnail.checksum.enable":"false","ACKNOWLEDGE_REFRESH_CONTENT_EVENTS":"false","microserviceApiGatewayEnabled":"true","k12rs.dashboard.enabled":"true","googleTagManagerContainerId":"1234","k12rs.event.tracker.enabled":"true"};
+
+    readerSelectionsConfig =
+        {"bookServiceUrl":"https://book-service-nightly.us-east-1.elasticbeanstalk.com/book-service/v1","environment":"nightly","platform":"realize","authGatewayTokenUrl":"/rest/rbs/tokens","authGatewayUrl":"/rest/rbs/tokens/proxies"};
+
+    
+    supportedCommonCartridgeVersions =
+        [{"id":1,"description":"CC v1.2"},{"id":2,"description":"CC v1.3"}];
+    
+</script>
+
+
+        <!-- CSS 3rd-party Libs -->
+        <!-- bootstrap.css cannot be concatenated into realize-libs.css because it has relative dependencies in /skins/default/css/bootstrap -->
+        <link type="text/css" rel="stylesheet" href="./suha_files/bootstrap.css">
+        <link type="text/css" rel="stylesheet" href="./suha_files/mediaelementplayer.min.css">
+
+        
+            
+                <link type="text/css" rel="stylesheet" href="./suha_files/realize-libs.css">
+            
+            
+        
+
+        <!-- Discussion Service CSS and counts toward mastery icon Dependencies-->
+        <link type="text/css" rel="stylesheet" href="./suha_files/font-awesome.min.css">
+        <link type="text/css" rel="stylesheet" href="./suha_files/full-jet-richtext.dir.css">
+        <link type="text/css" rel="stylesheet" href="./suha_files/discussion-service.min.css">
+
+        <!-- Notebook Service CSS -->
+        <link type="text/css" rel="stylesheet" href="./suha_files/nb-services.min.css">
+
+        <!-- CSS Realize Platform -->
+        <link type="text/css" rel="stylesheet" href="./suha_files/include-1.css">
+        <link type="text/css" rel="stylesheet" href="./suha_files/include-2.css">
+
+         <!-- JS Libraries -->
+        
+
+    
+        <script type="text/javascript" src="./suha_files/realize-libs-jq.js.download"></script>
+        <script type="text/javascript" src="./suha_files/realize-libs-ng.js.download"></script>
+        <script type="text/javascript" src="./suha_files/realize-libs-util.js.download"></script>
+    
+    
+
+        <script type="text/javascript" src="./suha_files/mediaelement-and-player.min.js.download"></script>
+
+<!-- Jet RichText -->
+<script type="text/javascript" src="./suha_files/full-jet-richtext.dir.min.js.download"></script>
+
+<!-- Discussion Microservice -->
+<!--[if IE 9]>
+<script type="text/javascript" src="/community/realizeit/lib/pmxdr/pmxdr-client.js"></script>
+<script type="text/javascript" src="/community/realizeit/lib/libxdr/libxdr.js"></script>
+<![endif]-->
+
+<script type="text/javascript" src="./suha_files/bootstrap-tooltip.min.js.download"></script>
+
+<script type="text/javascript" src="./suha_files/discussion-service.scripts.min.js.download"></script>
+<script type="text/javascript" src="./suha_files/discussion-service.templates.js.download"></script>
+
+<!-- FileUpload Microservice -->
+<script type="text/javascript" src="./suha_files/file-upload-button-service.scripts.min.js.download"></script>
+
+
+
+<!--- Google Drive Integration -->
+<script type="text/javascript" src="./suha_files/client.js.download" gapi_processed="true"></script>
+
+<!-- NoteBook Microservice  -->
+<script type="text/javascript" src="./suha_files/nb-services.min.js.download"></script>
+
+<!--- OneDrive Integration -->
+<script type="text/javascript" src="./suha_files/OneDrive.js.download"></script>
+
+<!-- Ionic v4 Integration -->
+<script type="text/javascript" src="./suha_files/ionic.js.download"></script><script src="./suha_files/ionic.wayt22pa.js.download" type="module" crossorigin="true" data-resources-url="https://www.pearsonrealize.com/community/realizeit/componentArchitecture/dist/ionic/dist/ionic/" data-namespace="ionic"></script>
+
+<script type="text/javascript">
+    WebFont.load({
+        custom: {
+            families: ['cabinbold', 'cabinitalic', 'cabinregular', 'cabinsemibold', 'cabinsemibold_italic',
+                'museo_slab_500italic', 'museo_slab_500regular', 'museo_slab_700regular', 'Avenir']
+        }
+    });
+
+    /* This is duplicate, it's loaded for all browsers in the main lib list.
+        Yepnope loader appears to be generating extra http requests.
+
+    // placeholder-polyfill (which browsers?)
+    yepnope({
+        test : Modernizr.input.placeholder,
+        nope : ['/community/realizeit/lib/jquery/placeholder/2.0.7/jquery.placeholder.min.js']
+    });
+    */
+
+    /* Script tag parameters - must be run before loading google platform.js script.
+        The parameters control the Classroom Share button loading mechanism. */
+    window.___gcfg = {
+        parsetags: 'explicit'
+    };
+</script>
+
+<!-- Google JavaScript API for the functionality Share with Google Classroom -->
+<script src="./suha_files/platform.js.download" gapi_processed="true"></script>
+
+
+        <!-- Realize Lib -->
+
+<script type="text/javascript" src="./suha_files/realize-lib.js.download"></script>
+
+<!-- Realize Common UI -->
+<script type="text/javascript" src="./suha_files/realize.ui.js.download"></script>
+
+<!-- Realize Common -->
+<script type="text/javascript" src="./suha_files/realize.core.js.download"></script>
+<script type="text/javascript" src="./suha_files/componentArchitecture.vendor.bundle.js.download"></script>
+    
+        
+        
+            <script type="text/javascript" src="./suha_files/componentArchitecture.en.js.download"></script>
+        
+    
+<link type="text/css" rel="stylesheet" href="./suha_files/componentArchitecture.css">
+
+
+        <!-- JS Realize Platform -->
+        
+            
+
+                <script src="./suha_files/realize.templates.js.download"></script>
+                <script src="./suha_files/realize-app.min.js.download"></script>
+
+            
+            
+        
+
+
+        
+        
+            <script src="./suha_files/appRoutesStudent.js.download"></script>
+        
+        
+
+
+        <!-- Assessment Player and Builder -->
+        
+        <script src="./suha_files/underscore-min.js.download"></script>
+        <script type="text/javascript" src="./suha_files/backbone-0.9.2.js.download"></script>
+        <script type="text/javascript" src="./suha_files/backbone.memento.js.download"></script>
+        <script src="./suha_files/jed.js.download"></script>
+        <script src="./suha_files/ckeditor.js.download"></script><style>.cke{visibility:hidden;}</style>
+        <script src="./suha_files/jquery.js.download"></script>
+        <script type="text/javascript" src="./suha_files/activityManagerBase.js.download"></script>
+        <script type="text/javascript" src="./suha_files/activityPlayerLoader.js.download"></script>
+
+        <script type="text/javascript" src="./suha_files/uxflib.js.download"></script>
+
+        
+            
+                <script type="text/javascript" src="./suha_files/assessmentservices.js.download"></script>
+            
+            
+        
+
+        <script type="text/javascript">
+            
+
+            UXF.Common.i18n.configure({
+                rootPath: '/community/realizeit/lib/assessmentbuilder/locale',
+                fileSet: ['/assessment-builder', '/assessment-player', '/gridded-response']
+            });
+
+            UXF.AssessmentPlayer.Config.init({
+                contextPath: '/community/rest',
+                resourcesRoot: '/community/realizeit/lib/assessmentbuilder/ui/assessmentplayer',
+                templateRoot: '/community/realizeit/lib/assessmentbuilder/ui/assessmentplayer/templates',
+                flowplayerRoot: '/community/realizeit/lib/flowplayer',
+                testNavPreviewApiUrl: 'http://tn8.pearsonrealize.com/',
+                useAssignmentFacadeService: true,
+                buildNumber: '7e128d2'
+            });
+
+
+            UXF.AssessmentBuilder.Config.init({
+                contextPath: '/community/rest',
+                templateRoot: '/community/realizeit/lib/assessmentbuilder/ui/assessmentbuilder/templates',
+                flowplayerRoot: '/community/realizeit/lib/flowplayer'
+            });
+
+        </script>
+
+        <script src="./suha_files/assessmentBuilder.svc.js.download"></script>
+        <script src="./suha_files/assessmentBuilder.ctrl.js.download"></script>
+
+        <link rel="stylesheet" type="text/css" href="./suha_files/player.css">
+        <link rel="stylesheet" type="text/css" href="./suha_files/player-skin.css">
+        <link rel="stylesheet" type="text/css" href="./suha_files/assessmentBuilder.css">
+        <link rel="stylesheet" type="text/css" href="./suha_files/griddedResponse.css">
+
+        
+
+        <!-- we need to base at other than root -->
+        <!--<base href="/community/">--><base href=".">
+    <script src="./suha_files/analytics.js.download"></script><style> .picker-dialog-frame{width:100%;height:100%;border:0;overflow:hidden}.picker-dialog-bg{position:absolute;top:0;left:0;background-color:#fff;z-index:1000}.picker-dialog{position:absolute;top:0;left:0;background-color:#fff;border:1px solid #acacac;width:auto;padding:0;z-index:1001;overflow:auto;-moz-box-shadow:rgba(0,0,0,.2) 0 4px 16px;-webkit-box-shadow:rgba(0,0,0,.2) 0 4px 16px;box-shadow:rgba(0,0,0,.2) 0 4px 16px}.picker-dialog-content{font-size:0;padding:0}.picker-dialog-title,.picker-dialog-buttons{display:none}</style></head>
+    <body ng-app="RealizeApp" class="section-classes student locale-en hide-platform" has-fixed-elements="" ng-class="indexBodyClass()" style="">
+
+    <!-- Google Tag Manager (noscript) -->
+    
+    
+    <!-- End Google Tag Manager (noscript) -->
+
+    <!-- ngIf: false -->
+
+    <div id="contentLoading" ng-show="viewLoading || subNavLoading" role="alert" class="modal__contentBackground ng-hide" style="">
+        <i class="icon-spinner icon-spin"></i>
+        <div class="message ng-binding">Loading...</div>
+    </div>
+
+    <div id="header" role="banner" ng-hide="hidePlatform" class="modal__contentBackground ng-hide" style="">
+        <div id="skipNav">
+            <a href="https://www.pearsonrealize.com/community/" ng-click="skipNav($event)" class="ng-binding">skip to main content</a>
+        </div>
+        <div id="globalNav">
+            <realize-main-nav class="ng-isolate-scope"><!-- ngInclude: --><div ng-include="" src="mainNavCtrl.headerTmplUrl" class="ng-scope" style=""><div id="globalNav-inner" role="navigation" class="ng-scope">
+    <ul id="mainNav" class="nav nav-pills pull-left">
+        <li class="section first" ng-class="{active: mainNavCtrl.location.path().search(&#39;/home&#39;) === 0}">
+            <a ng-href="home" id="realize-logo" class="realize_toggleFocus" href="https://www.pearsonrealize.com/community/home">
+                <img ng-src="/community/realizeit/skins/default/images/realize_logo.png" alt="Pearson Realize Home" class="logo-inner" src="./suha_files/realize_logo.png">
+            </a>
+        </li>
+        <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_REVIEWER') -->
+        <li class="section" ng-class="{active: mainNavCtrl.location.path().search(&#39;/program&#39;) === 0 || mainNavCtrl.location.path().search(&#39;/browseAll&#39;) === 0}">
+            <a href="javascript://" ng-click="mainNavCtrl.browse(&#39;main_nav_link&#39;);" id="programs" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Programs&#39;, action: &#39;Programs&#39;}" class="ng-binding">
+                Browse
+            </a>
+        </li>
+        <li class="section active" ng-class="{active: mainNavCtrl.location.path().search(&#39;/classes&#39;) === 0 || mainNavCtrl.location.path().search(&#39;/error/no-programs-pageSource-classes&#39;) === 0}">
+            <a ng-click="mainNavCtrl.location.path(&#39;/classes&#39;);mainNavCtrl.location.search({});" href="javascript://" id="classes" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Classes&#39;}" class="ng-binding">Classes</a>
+        </li>
+        <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_TEACHER') -->
+        <!-- ngIf: mainNavCtrl.hasTeacherRole -->
+        <!-- ngIf: mainNavCtrl.currentUser.$hasCenter() && mainNavCtrl.currentUser.hasRole('ROLE_TEACHER') -->
+        <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') --><li ng-if="mainNavCtrl.currentUser.hasRole(&#39;ROLE_STUDENT&#39;)" class="section ng-scope" ng-class="{active: mainNavCtrl.location.path().search(&#39;/grades&#39;) === 0}">
+            <a href="javascript://" ng-click="mainNavCtrl.location.path(&#39;/grades&#39;);mainNavCtrl.location.search({});" id="grades" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Grades&#39;, action: &#39;Grades&#39;}" class="ng-binding">Grades</a>
+        </li><!-- end ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') -->
+    </ul>
+    <ul id="utilityNav" class="nav nav-pills pull-right">
+        <li id="keywordSearchMenu" class="dropdown" ng-class="{active: mainNavCtrl.location.path().search(&#39;/search&#39;) === 0}" focus-on-dropdown="#SearchTextInput">
+            <a href="javascript://" id="keywordSearchDropdown" class="dropdown-toggle" title="Search Tool" aria-label="Search Tool" role="button" dropdown-a11y="" dd-a11y-toggle-only="true" aria-haspopup="true" aria-expanded="false">
+                <i class="icon-search"></i>
+                <span class="a11yOffScreen ng-binding">Search</span>
+            </a>
+            <ul class="dropdown-menu pull-right" aria-labelledby="keywordSearchDropdown">
+                <li role="presentation">
+                    <form name="keywordSearchForm" enter-key-shim="" ng-submit="mainNavCtrl.search(keywords)" class="ng-pristine ng-valid ng-valid-maxlength">
+                        <label for="SearchTextInput" ng-click="$event.stopPropagation()" class="ng-binding">Search for content</label>
+                        <div id="globalSearch" role="menu" class="clearfix" ng-class="{&#39;focused&#39;: searchInputFocused}">
+                            <input id="SearchTextInput" type="text" ng-focus="searchInputFocused = 1" ng-blur="searchInputFocused = 0" ng-model="keywords" black-list="/" maxlength="100" ng-click="$event.stopPropagation()" class="ng-pristine ng-untouched ng-valid ng-empty ng-valid-maxlength">
+                            <button type="submit" role="menuitem" ng-disabled="!keywords" aria-label="Search" class="ng-binding" disabled="disabled">Search</button>
+                        </div>
+                        <!-- ngIf: mainNavCtrl.inProgramsTab() -->
+                    </form>
+                </li>
+            </ul>
+        </li>
+        <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_TEACHER') -->
+        <li id="userMenu" class="dropdown" ng-class="{active: mainNavCtrl.location.path().search(&#39;/profile&#39;) === 0}">
+            <a href="javascript://" id="usernameDropdown" class="dropdown-toggle" title="Settings" role="button" dropdown-a11y="" aria-haspopup="true" aria-expanded="false">
+                <i class="icon-user"></i>
+                <i class="icon-caret-down"></i>
+                <span class="a11yOffScreen ng-binding">Settings</span>
+            </a>
+            <ul class="dropdown-menu pull-right" aria-labelledby="usernameDropdown" role="menu">
+                <li role="presentation" class="userInfo">
+                    <div class="icon" aria-hidden="true"><img ng-src="/community/realizeit/skins/default/images/profile_icons/15_student.png" width="70" height="45" border="0" alt="" src="./suha_files/15_student.png"></div>
+                    <div class="name ng-binding">SHAMAMA SUHA</div>
+                </li>
+                <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_TEACHER') -->
+                <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_TEACHER') -->
+                <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') --><li ng-if="mainNavCtrl.currentUser.hasRole(&#39;ROLE_STUDENT&#39;)" role="presentation" class="ng-scope">
+                    <a data-e2e-id="profile" href="javascript://" ng-click="mainNavCtrl.location.path(&#39;/profile&#39;);mainNavCtrl.location.search({});" role="menuitem" tabindex="-1" aria-label="Settings link" class="ng-binding">Settings</a>
+                </li><!-- end ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') -->
+                <!-- ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') --><li ng-if="mainNavCtrl.currentUser.hasRole(&#39;ROLE_STUDENT&#39;)" role="presentation" class="ng-scope">
+                    <a href="javascript://" role="menuitem" tabindex="-1" aria-label="Help for This Page link" ng-click="mainNavCtrl.callHelpMenuTelemetry(&#39;online_help&#39;)" class="ng-binding">Help for This Page</a>
+                </li><!-- end ngIf: mainNavCtrl.currentUser.hasRole('ROLE_STUDENT') -->
+                <li role="presentation">
+                    <a data-e2e-id="logout" ng-href="logout" role="menuitem" tabindex="-1" aria-label="Sign out link" class="ng-binding" href="https://www.pearsonrealize.com/community/logout">Sign out</a>
+                </li>
+            </ul>
+        </li>
+    </ul>
+</div>
+</div></realize-main-nav>
+        </div>
+        <div id="sectionNav" ng-show="subnavState != &#39;hidden&#39;" class="ng-hide" style="">
+            <div id="sectionNav-inner">
+                <!-- ngInclude: subNavTemplate --><div ng-include="subNavTemplate" class="ng-scope"><div ng-controller="ClassesSubNavCtrl" class="classesSubNav ng-scope">
+    <div class="name">
+        <h1 class="classesSubNav__className ng-binding" ng-show="rosters.length &lt;= 1">4-508
+            <!-- ngIf: currentRoster.isGoogleClass() --><span data-e2e-id="googleClassroomIconForClassName" ng-if="currentRoster.isGoogleClass()" class="google-class-icon ng-scope" style=""></span><!-- end ngIf: currentRoster.isGoogleClass() -->
+        </h1>
+        <!-- ngIf: rosters.length > 1 -->
+    </div>
+    <div class="menu">
+        <ul class="nav nav-pills">
+            <li ng-show="currentUser.hasRole(&#39;ROLE_TEACHER&#39;)" ng-class="{ active: activeAssignmentTab() }" data-e2e-id="assignments" class="ng-hide active">
+                <a href="javascript://" ng-click="location.path(&#39;/classes/&#39; + currentRoster.classId + &#39;/assignments&#39;);location.search({});" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Assignments&#39;}" class="ng-binding">Assignments</a>
+            </li>
+            <li ng-show="currentUser.hasRole(&#39;ROLE_STUDENT&#39;)" ng-class="{ active: activeAssignmentTab() }" data-e2e-id="assignments" class="active">
+                <a href="javascript://" ng-click="location.path(&#39;/classes/&#39; + currentRoster.classId + &#39;/assignments&#39;);location.search({});" class="ng-binding">Assignments</a>
+            </li>
+            <li ng-show="currentUser.hasRole(&#39;ROLE_TEACHER&#39;)" ng-class="{ active: location.path().search(&#39;/calendar&#39;) &gt;= 0 }" data-e2e-id="calendar" class="ng-hide">
+                <a href="javascript://" ng-click="location.path(&#39;/classes/&#39; + currentRoster.classId + &#39;/calendar&#39;);location.search({});" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Calendar&#39;}" class="ng-binding">Calendar</a>
+            </li>
+            <li ng-class="{ active: activeDiscussTab() }" data-e2e-id="discuss">
+                <a href="javascript://" ng-click="clickDiscussTab()" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Discuss&#39;}" class="ng-binding">Discuss</a>
+            </li>
+            <li ng-show="currentUser.hasRole(&#39;ROLE_TEACHER&#39;)" ng-class="{ active: location.path().search(&#39;/students&#39;) &gt;= 0 }" data-e2e-id="students" class="ng-hide">
+                <a href="javascript://" ng-click="location.path(&#39;/classes/&#39; + currentRoster.classId + &#39;/students&#39;);location.search({});" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Students &amp; Groups&#39;}" class="ng-binding">Students &amp; Groups</a>
+            </li>
+            <li ng-show="currentUser.hasRole(&#39;ROLE_TEACHER&#39;)" ng-class="{ active: location.path().search(&#39;/manage&#39;) &gt;= 0 }" data-e2e-id="manage" class="ng-hide">
+                <a href="javascript://" ng-click="location.path(&#39;/classes/&#39; + currentRoster.classId + &#39;/manage&#39;);location.search({});" rlz-track-click="track.action" rlz-track-click-event="{category: &#39;Classes&#39;, action: &#39;Class settings&#39;}" class="ng-binding">Class Settings</a>
+            </li>
+        </ul>
+    </div>
+</div>
+</div>
+            </div>
+        </div>
+    </div>
+    <div id="pageWrap" tabindex="-1" class="cvInheritHeight modal__contentBackground mediaType-interactive-media">
+        <!-- site view -->
+        <div id="sectionBody" role="main" class="cvInheritHeight modal__contentBackground">
+            <a id="skipTarget" href="javascript://" class="a11yOffScreen" tabindex="-1"></a>
+            <!-- ngView: --><div ng-view="" class="cvInheritHeight modal__contentBackground ng-scope" style=""><!-- added static class modal__contentBackground to set aria hidden when modal component is used -->
+<div id="content-viewer" class="cvInheritHeight modal__contentBackground overflowYHidden ng-scope">
+    <div alert="" alert-closable="" alert-on="answerError" alert-type="error" class="ng-isolate-scope"><!-- ngIf: alertOn -->
+</div>
+    <div alert="" alert-closable="" alert-on="warningEnabled" alert-type="info" class="ng-isolate-scope"><!-- ngIf: alertOn -->
+</div>
+    <!-- ngIf: !assignmentViewerHeaderVisible -->
+    <div class="content-viewer__fixedHeader" id="contentViewerFixedHeader">
+        <!-- ngIf: assignmentViewerHeaderVisible --><av-header ng-if="assignmentViewerHeaderVisible" on-exit="onBack($event)" assignment-data="lwcAssignment" is-review-mode="getReviewMode()" is-preview-mode="isPreviewMode" before-marking-assignment-complete="beforeTurnIn()" class="ng-scope ng-isolate-scope"><!-- ngIf: $ctrl.assetsLoading -->
+<div class="av__headerNavbar" data-e2e-id="assignmentViewerHeader">
+    <div class="av__navbar--inner clearfix">
+        <div class="av__exit">
+            <a href="javascript://" ng-click="$ctrl.goBack($event)" data-e2e-id="exit-btn" class="kb-mode">
+                <i class="icon-chevron-left" data-e2e-id="exit-icon"></i>
+                <span class="av__exitText ng-binding">Exit</span>
+            </a>
+        </div>
+        <div class="av__assignmentTitle ng-binding" data-e2e-id="av__assignmentTitle">
+            Sort 6: Interactive Sort
+        </div>
+        <!-- ngIf: $ctrl.showDueDateStatus  && !$ctrl.isReviewMode --><div ng-if="$ctrl.showDueDateStatus  &amp;&amp; !$ctrl.isReviewMode" class="av__assignmentDueMessages ng-scope">
+            <!-- ngIf: !$ctrl.assignmentData.isAssignmentPastDueDate() --><div ng-if="!$ctrl.assignmentData.isAssignmentPastDueDate()" class="av__assignmentDueDate ng-binding ng-scope" data-e2e-id="av__assignmentDueDate">
+                Due  04/07/20 11:59pm
+            </div><!-- end ngIf: !$ctrl.assignmentData.isAssignmentPastDueDate() -->
+            <!-- ngIf: $ctrl.assignmentData.isAssignmentPastDueDate() && !$ctrl.isReviewMode -->
+        </div><!-- end ngIf: $ctrl.showDueDateStatus  && !$ctrl.isReviewMode -->
+        <!-- ngIf: $ctrl.showTurnInButton() -->
+        <!-- ngIf: $ctrl.isTeacherReviewMode -->
+        <!-- ngIf: $ctrl.showTurnInText() -->
+    </div>
+</div>
+</av-header><!-- end ngIf: assignmentViewerHeaderVisible -->
+        <!-- ngIf: assignmentViewerAssetsVisible -->
+        <!-- ngIf: showAdaptiveBar() -->
+        <!-- ngIf: showNotificationBar() -->
+    </div>
+    <!-- ngIf: displayEditLinkForGoogleDoc(content) -->
+    <!-- ngIf: showToolbar() -->
+    <div class="lwcSidebarParent lwcSidebarParent--webkitScrollTouch" ng-class="{&#39;lwcSidebarParent--webkitScrollTouch&#39;:
+            content.mediaType != &#39;Test&#39;}">
+        <div class="lwcSidebarSibling flexColumnGrow">
+        <!-- Use this element to set focus to content display area when down arrow is pressed from Assignment Viewer tab-->
+            <span id="content-body-top" tab-to="" shift-tab-to=".asset--active" class="flexColumnGrow content-body" ng-class="{
+                    &#39;contentItem__adaptive--bgColor&#39;: content.mediaType === &#39;Adaptive Homework&#39;,
+                    &#39;content-body--withToolbar&#39;: showToolbar() &amp;&amp; !showSidePanel
+                }">
+                <!-- ngIf: isLanguageSelectOptionEnabled  && !showContentViewerBanner -->
+                <!-- ngIf: isRecommendation -->
+                <!-- ngIf: showProgress || showSummary -->
+                <!-- ngIf: getIsContentUrlInvalid() && isContentUrlRequired && !isLanguageSelectOptionEnabled -->
+                <!-- ngIf: showContentViewerBanner -->
+                <!-- ngIf: !(getIsContentUrlInvalid() && isContentUrlRequired) && !showContentViewerBanner
+                    && !isLanguageSelectOptionEnabled --><div class="flexColumnGrow content-body ng-scope" ng-if="!(getIsContentUrlInvalid() &amp;&amp; isContentUrlRequired) &amp;&amp; !showContentViewerBanner
+                    &amp;&amp; !isLanguageSelectOptionEnabled" ng-hide="showLoading || showProgress || showSummary" ng-switch="content.restrictedDownloadContent" ng-style="containerStyle">
+                    <!-- ngSwitchWhen: Download Only -->
+
+                    <!-- ngSwitchDefault: --><div ng-switch-default="" ng-switch="content.fileType" class="content-body flexColumnGrow overflowYHidden ng-scope interactive_media" ng-class="content.mediaType | lowercase | underscores">
+
+                        <!-- ngSwitchWhen: TinCanSCO --><div ng-switch-when="TinCanSCO" class="flexColumnGrow webkitTouchScroll ng-scope">
+                            <iframe class="flexColumnGrow flexboxIosIframeResizeFix ng-isolate-scope" ng-src="/community/scorm/courses/1340ab9139d45152e3f7c51734adb896-20191024012542/A0650619/player.html?tc=y" width="100%" height="740" frameborder="0" sco-player="" aria-labelledby="content-viewer-title" name="tinCanScoPlayer" sco="content" student-attempt="userAssignmentId" review="isReview" src="./suha_files/player.html"></iframe>
+                        </div><!-- end ngSwitchWhen: -->
+
+                        <!-- ngSwitchWhen: SCO -->
+
+                        <!-- ngSwitchWhen: OpenEd|HTML -->
+                        <!-- ngSwitchDefault: -->
+                    </div><!-- end ngSwitchWhen: -->
+                </div><!-- end ngIf: !(getIsContentUrlInvalid() && isContentUrlRequired) && !showContentViewerBanner
+                    && !isLanguageSelectOptionEnabled -->
+
+                <!-- ngIf: isAdaptive -->
+
+                <!-- ngIf: shouldIncludeFooterElement() -->
+            </span>
+            <!-- ngIf: content.mediaType === 'Google Doc' -->
+        </div>
+        <lwc-sidebar open="showSidePanel" side="right" aria-hidden="true" class="lwcSidebar--closed ng-isolate-scope lwcSidebar--right" ng-style="rubricPanelHeight" disable-exit-button="true" style="height: 700px;"><div class=" lwcSidebar">
+    <!-- ngIf: !$ctrl.disableExitButton -->
+    <ng-transclude>
+            <av-rubric-side-panel data-e2e-id="rubricPanel" user-assignment-id="7542839e3f2f4e4db9e3a2fa776e7483" question-id="questionId" student-id="" is-score-mode="rubricConfig.isScoreMode" program-title="Words Their Way Classroom 2019" is-assignment-viewer-page="assignmentViewerHeaderVisible" is-rubric-interactive="rubricConfig.isRubricInteractive" is-score-sent="rubricConfig.isScoreSent" show-side-panel="showSidePanel" show-cannot-score-rubric-warning-message="rubricConfig.showCannotScoreRubricWarningMessage" close-rubrics-panel="closeSidebar(isRubricPanelClosedFromAssignmentViewer, isClosedFromContentViewerWithArrowClose)" is-rubric-available="content.rubricAvailable" rubric-guid="rubricConfig.rubricGuid" external-id="content.externalId" overridden-percentage-score="rubricConfig.overriddenPercentageScore" overridden-score="rubricConfig.overriddenScore" class="ng-scope ng-isolate-scope hideRubricPanel"><!-- ngIf: $ctrl.isRubricDataAvailable --><div ng-if="$ctrl.isRubricDataAvailable" class="rubricPanel__content ng-scope" tabindex="0" data-e2e-id="rubricPanel-content">
+    <div class="rubricPanel__header" data-e2e-id="rubricPanel-header">
+        <a ng-click="$ctrl.closeSidebar()" class="rubricPanel__arrowRight" id="rubricCloseButton" role="button" href="javascript://" aria-label="Close rubric panel" data-e2e-id="rubricPanel-close-icon">
+            <span class="icon-circle-arrow-right" data-e2e-id="rubric-arrowRight-close" aria-hidden="true"></span>
+        </a>
+        <h1 class="rubricPanel__title ng-binding" data-e2e-id="rubricPanel-title" aria-label="">
+            
+        </h1>
+        <!-- ngIf: $ctrl.shouldDisplayRubricViewScore() -->
+        <!-- ngIf: $ctrl.shouldDisplayOverriddenScore() -->
+    </div>
+    <div class="rubricPanel__body" data-e2e-id="rubricPanel-body">
+        <!-- ngIf: $ctrl.shouldDisplayOverriddenScore() -->
+        <!-- ngIf: $ctrl.showCannotScoreRubricWarningMessage -->
+        <!-- ngRepeat: dimension in $ctrl.rubricData.dimensions track by $index -->
+    </div>
+    <!-- ngIf: $ctrl.isRubricInteractive -->
+</div><!-- end ngIf: $ctrl.isRubricDataAvailable -->
+<!-- ngIf: !$ctrl.isRubricDataAvailable -->
+</av-rubric-side-panel>
+        </ng-transclude></div>
+</lwc-sidebar>
+    </div>
+</div>
+</div>
+        </div>
+
+        <div class="footer-push"></div>
+    </div>
+    <!-- footer -->
+     <div id="footer" role="contentinfo" ng-hide="hidePlatform" class="modal__contentBackground ng-hide">
+        <div id="footer-inner" class="clearfix">
+
+            <span id="copyright" class="ng-binding"> Copyright © 2020 Savvas Learning Company LLC.
+                or its affiliates. All Rights Reserved.
+            </span>
+            <ul>
+                <li>
+                    <a data-e2e-id="userAgreement" href="https://www.pearsonrealize.com/community/prelogin/userAgreement.html" target="_blank" class="ng-binding">User Agreement</a> |
+                </li>
+                <li>
+                    <a data-e2e-id="privacyPolicy" href="https://www.pearsonrealize.com/community/prelogin/privacy/corporate/privacy/learning-services-privacy-policy.html" target="_blank" class="ng-binding">Privacy Policy</a> |
+                </li>
+                <li>
+                    <a href="https://media.pearsoncmg.com/curriculum/credits/index.html" target="_blank" class="ng-binding">Credits</a>
+                </li>
+            </ul>
+            <span>
+                
+                    | rev. 7e128d2
+                
+            </span>
+            <span id="footer-logo" class="pull-right">
+                <img src="./suha_files/logo-pearson-white.png" width="85" height="16" alt="Pearson Education">
+            </span>
+        </div>
+    </div>
+
+    <!-- modal dialog -->
+    <div class="modalRegion"></div>
+
+
+
+<iframe id="ssIFrame_google" sandbox="allow-scripts allow-same-origin" aria-hidden="true" frame-border="0" src="./suha_files/iframe.html" style="position: absolute; width: 1px; height: 1px; left: -9999px; top: -9999px; right: -9999px; bottom: -9999px; display: none;"></iframe><iframe frameborder="0" src="./suha_files/saved_resource.html" class="picker shr-q-shr-r-shr-xb picker-dialog-bg" style="border: 0px; vertical-align: bottom; opacity: 0; width: 1595px; height: 793px; display: none;"></iframe><div class="picker shr-q-shr-r-shr-xb picker-dialog-bg" style="opacity: 0.5; width: 1595px; height: 793px; display: none;"></div><div class="picker shr-q-shr-r picker-dialog" tabindex="0" role="dialog" aria-labelledby=":0" style="left: 270.5px; top: 68.5px; display: none;"><div class="picker shr-q-shr-r-shr-m shr-q-shr-r-shr-m-shr-ce picker-dialog-title"><span class="picker shr-q-shr-r-shr-m-shr-n" id=":0" role="heading"></span><span class="picker shr-q-shr-r-shr-m-shr-yb" role="button" tabindex="0" aria-label="Close" style="display: none;"></span></div><div class="picker shr-q-shr-r-shr-td picker-dialog-content" style="width: 1052px; height: 650px;"><iframe id="tv12l9hckhtg" name="tv12l9hckhtg" class="picker-frame picker-dialog-frame" frameborder="0" allow="camera" src="./suha_files/picker.html" tabindex="0"></iframe></div><div class="picker shr-q-shr-r-shr-be picker-dialog-buttons" style="display: none;"></div></div><span tabindex="0" style="position: absolute; left: 270.5px; top: 68.5px; display: none;"></span><iframe id="apiproxy14a3bfb27b11da00d5ecd4597c562eb50f2362ea0.909415233" name="apiproxy14a3bfb27b11da00d5ecd4597c562eb50f2362ea0.909415233" src="./suha_files/proxy.html" tabindex="-1" aria-hidden="true" style="width: 1px; height: 1px; position: absolute; top: -100px; display: none;"></iframe></body></html>

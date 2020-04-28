@@ -1,0 +1,5 @@
+for import (from git repo to eclipse) you should rename first one name which was available in eclipse because new one will come at same name
+from repo.
+git checkout b (branch name) //can make new branch and switch to that branch
+git pull origin or path of repo then branch name which branch you want to send
+git push -u origin branch name which branch you want to send.

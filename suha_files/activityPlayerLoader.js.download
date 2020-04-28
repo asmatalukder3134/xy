@@ -1,0 +1,221 @@
+/* The custom version makes the following changes:
+ *      1.  Wraps Paf.ActivityPlayerLoader class definition in an immediately-invoked function expression. This protects it
+ *          from the global namespace.
+ *
+ *      2.  Removes the dependency on Mootools' "Class" object. Mootools changes the prototypes of Javascript native functions.
+ *          This can't be avoided by namespacing MooTools. https://mootools.lighthouseapp.com/projects/2706/tickets/219-mootools-namespace
+ **/
+
+﻿var Paf = Paf || {};
+
+/**
+ * All Player Frame communication should be proxied by this class.
+ * This will make it easiest to handle various message and check security.
+ */
+(function(Paf, undefined){
+
+    Paf.ActivityPlayerLoader = function (playerFrame) {
+        this._playerFrame = playerFrame;
+        this._registerMessageHandler();
+    };
+
+    Paf.ActivityPlayerLoader.prototype = {
+
+        _playerReadyDeferred: null,
+
+        _playerFrame: null,
+
+        timeout: 30000,
+
+        _timeoutHandle: null,
+
+        EVENT_NODERESULT: "NodeResult",
+        EVENT_SEQUENCENODE_LOADED: "SequenceNodeLoaded",
+        EVENT_GETSEQUENCENODE: "GetSequenceNode",
+        EVENT_CHECKRESULT: "CheckResult",
+
+		//ToggleUI occurs when modal dialogs are display and dismissed.  Usually, the asignment player UI will disable
+		//navigation buttons when this happens.
+		EVENT_TOGGLE_UI: "ToggleUI",
+
+		//ToggleStandy occurs when the player is "busy" loading.  Usually, the assignment player UI will
+		//put up an overlay with an animated gif.
+		EVENT_TOGGLE_STANDBY: "ToggleStandby",
+
+        /**
+         * Constructor for ActivityPlayerLoader
+         */
+        /*initialize: function (playerFrame) {
+            this._playerFrame = playerFrame;
+            this._registerMessageHandler();
+        },*/
+
+        /**
+         * Call to register events using a callback with an optional context.
+         */
+        bind: function (eventName, callback, context) {
+            if (context) {
+                var newCallback = function () {
+                    callback.apply(context, arguments);
+                };
+                $(this).bind(eventName, newCallback);
+            }
+            else
+                $(this).bind(eventName, callback);
+        },
+
+        /**
+         * Load frame with playerUri and optional messageId
+         */
+        loadPlayer: function (playerUri) {
+            return this._loadPlayer(playerUri, this._loadPlayerSource);
+        },
+
+        /**
+         * Post and html5 message to the player
+         */
+        postMessage: function (message) {
+            var msg = JSON.stringify(message);
+            this._playerFrame.contentWindow.postMessage(msg, this._playerFrame.src);
+        },
+
+        _handleMessage: function (message) {
+            switch (message["@type"]) {
+                case "PlayerReady":
+                    this._playerReady();
+                    break;
+                case "NodeResultResponse":
+                    this._handleNodeResult(message);
+                    break;
+                case "SequenceNodeLoaded":
+                    // Item player is responding that it has finished loading a sequence.
+                    this._handleSequenceNodeLoaded(message);
+                    break;
+                // These messages will originate from a Custom Assignment Player
+                case "GetSequenceNode":
+                    this._handleGetSequence(message);
+                    break;
+                // Check result
+                case "CheckResult":
+                    this._handleCheckResult(message);
+                    break;
+				case "ToggleUI":
+					this._handleToggleUI(message);
+					break;
+				 case "ToggleStandby":
+					this._handleToggleStandby(message);
+					break;
+
+                default:
+                    $.logThis("PAF Activity Manager received unknown message: ", message);
+                    break;
+            }
+        },
+
+        _handleNodeResult: function (message) {
+            $(this).trigger(this.EVENT_NODERESULT, message);
+        },
+
+        _handleSequenceNodeLoaded: function (message) {
+            $(this).trigger(this.EVENT_SEQUENCENODE_LOADED, message);
+        },
+
+        _handleGetSequence: function (message) {
+            $(this).trigger(this.EVENT_GETSEQUENCENODE, message);
+        },
+
+        _handleCheckResult: function (message) {
+            $(this).trigger(this.EVENT_CHECKRESULT, message);
+        },
+
+        _handleToggleUI: function (message) {
+            $(this).trigger(this.EVENT_TOGGLE_UI, message);
+        },
+
+        _handleToggleStandby: function (message) {
+            $(this).trigger(this.EVENT_TOGGLE_STANDBY, message);
+        },
+
+        _registerMessageHandler: function () {
+            var context = this;
+            $(window).on("message", function (e) {
+                // Do security check here.  If we pass then interpret data.
+                // Do security check and make sure this message has originated from our frame.
+                if (e.originalEvent.source !== context._playerFrame.contentWindow)
+                    return;
+                // Security check passed so process the message
+                var message = $.parseJSON(e.originalEvent.data);
+                $.logThis("PAF Activity Manager received message: ", message);
+                context._handleMessage(message);
+            });
+        },
+
+        _clearTimeout: function () {
+            if (this._timeoutHandle) {
+                clearTimeout(this._timeoutHandle);
+                this._timeoutHandle = null;
+            }
+        },
+
+        /**
+         * Pull the base CSS from Activity Manager and attach to the iframe's HTML through postMessage
+         * Note: the href should be absolute URL's
+         */
+        _setPlayerBaseCSS: function () {
+            var iframe = document.getElementById('activity-frame');
+            var css;
+            if ($('#am-base-css').length > 0)
+                css = '<link id="am-base-css" href="' + $('#am-base-css')[0].href + '" rel="stylesheet" type="text/css">';
+            if ($('#am-custom-css').length > 0)
+                css += '<link id="am-custom-css" href="' + $('#am-custom-css')[0].href + '" rel="stylesheet" type="text/css">';
+            var cssEvent = {
+                "@type": 'SetBaseCss',
+                "@css": css
+            };
+            this.postMessage(cssEvent);
+        },
+
+        _playerReady: function () {
+            // If there is a timeout handle, just clear it.
+            this._clearTimeout();
+            var deferred = this._playerReadyDeferred;
+            if (deferred) {
+                deferred.resolve();
+                this._playerReadyDeferred = null;
+            }
+        },
+
+        _loadPlayer: function (playerUri, sourceLoader) {
+            var deferred = this._playerReadyDeferred = $.Deferred();
+            sourceLoader.apply(this, [playerUri]);
+            var context = this;
+            // If deferred is not already resolved, then set a timer just in case
+            if (deferred.state() == "pending") {
+                context._timeoutHandle = setTimeout(function () {
+                    // Since timeout occurred, let's just reset handle so we don't call clearTimeout inside _playerReady
+                    context._timeoutHandle = null;
+                    $.logThis("Player considered loaded after timeout.");
+                    context._playerReady();
+                }, this.timeout);
+            }
+            return deferred.promise();
+        },
+
+        _loadFrameSource: function (playerUri) {
+            var context = this;
+            if (this._playerFrame.src != playerUri) {
+                $.logThis("Player loading...", playerUri);
+                this._playerFrame.src = playerUri;
+                this._setPlayerBaseCSS();
+            }
+            else {
+                $.logThis("Player already loaded.", playerUri);
+                context._playerReady(playerUri);
+            }
+        },
+
+        _loadPlayerSource: function (playerUri, messageId) {
+            this._loadFrameSource(playerUri);
+        }
+    };
+})(Paf);

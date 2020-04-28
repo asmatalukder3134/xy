@@ -1,0 +1,227 @@
+var OnboardingTour = {};
+
+OnboardingTour.init = function (cdn, modalType) {
+	var docCountString = COOKIE.get('num_of_docs'),
+		docCount = Number(docCountString),
+		currentPathname = document.location.pathname,
+		modalSelector = '.onboardingModal.' + modalType;
+
+		this.currentPathname = currentPathname;
+		this.currentFlow = modalType.charAt(0).toUpperCase() + modalType.slice(1);
+
+		// Check if script is running on document library
+		if (this.currentPathname === '/documentLibrary.php') {
+			OnboardingTour.handleDocumentLibraryLogic();
+		} else {
+
+			// Set document type based on builder
+			if (window.DocumentSettings) {
+				this.currentDocumentType = DocumentSettings.type;
+			}
+
+			if (window.CurrentDocumentInfo) {
+				this.currentDocumentType = CurrentDocumentInfo.type;
+			}
+
+			if (currentPathname === '/free-write/edit-sign.php') {
+				// Delete cookie that is automatically created when opening static doc in free-write edit/sign
+				COOKIE.unset('documentExported');
+			}
+
+			// Check if search modal has been initialized
+			if (modalType === 'create') {
+				OnboardingTour.setDocumentSearchHandlers();
+			}
+
+			if (currentPathname === '/free-write/edit-share.php') {
+				OnboardingTour.setEditShareClickEventHandlers(modalType);
+
+				// Delete cookie that is automatically created when opening static doc in free-write edit/share
+				COOKIE.unset('documentExported');
+			} else {
+				OnboardingTour.checkForExport(docCount, modalSelector, modalType, cdn);
+			}
+
+			OnboardingTour.setClickEventHandlers(modalSelector, modalType);
+		}
+};
+
+OnboardingTour.checkForExport = function (docCount, modalSelector, modalType, cdn) {
+	window.checkForExportCookieIntervalCleared = false;
+	var checkForExportCookieIntervalId = setInterval(function () {
+		var exportCookieStatus = COOKIE.get('documentExported');
+		if (exportCookieStatus) {
+			var firstDocumentExportStatus = COOKIE.get('firstDocumentExported'),
+				secondaryActionStatus = COOKIE.get('secondaryActionClicked'),
+				successStatus = COOKIE.get('successModalShown');
+
+			COOKIE.unset('documentExported');
+
+			// If first document has not been exported, set cookie and show modal
+			if (!firstDocumentExportStatus && docCount === 1) {
+				COOKIE.set('firstDocumentExported', 1);
+
+				$(modalSelector).modal('show');
+				OnboardingTour.track(modalType, 'Second Action Modal');
+
+			// If first document has been exported and the secondary action has been clicked, show success modal
+			} else if (firstDocumentExportStatus && !successStatus && (secondaryActionStatus === 'create' || 'upload' || 'sign' || 'duplicate')) {
+				// If secondaryAction is create, check the document type length. If document type length is 32, we know it is a custom document and not from library
+				if (secondaryActionStatus === 'create') {
+					var documentFromLibraryType = COOKIE.get('documentFromLibrarySelected');
+
+					if (OnboardingTour.currentDocumentType === documentFromLibraryType) {
+						$('.onboardingModal.success').modal('show');
+						OnboardingTour.track(modalType, 'Success Modal');
+						COOKIE.set('successModalShown', 1);
+					}
+				} else if (secondaryActionStatus === 'sign'){
+					// Show success modal only if on /edit-sign.php
+					if (OnboardingTour.currentPathname === '/free-write/edit-sign.php') {
+						if ($('.img_popup').length) {
+							$('.onboardingModal.success').modal('show');
+							OnboardingTour.track(modalType, 'Success Modal');
+							COOKIE.set('successModalShown', 1);
+						}
+					}
+				} else if (secondaryActionStatus === 'upload') {
+					if (DocumentSettings.type.length >= 32) {
+						$('.onboardingModal.success').modal('show');
+						OnboardingTour.track(modalType, 'Success Modal');
+						COOKIE.set('successModalShown', 1);
+					}
+				} else if (secondaryActionStatus === 'duplicate') {
+					var duplicatedDocument = COOKIE.get('documentDuplicated');
+
+					if (OnboardingTour.currentDocumentType === duplicatedDocument) {
+						$('.onboardingModal.success').modal('show');
+						OnboardingTour.track(modalType, 'Success Modal');
+						COOKIE.set('successModalShown', 1);
+					}
+				}
+			}
+
+			clearInterval(checkForExportCookieIntervalId);
+			window.checkForExportCookieIntervalCleared = true;
+		}
+	}, 1000);
+};
+
+OnboardingTour.setEditShareClickEventHandlers = function (modalType) {
+	var firstDocumentExportStatus = COOKIE.get('firstDocumentExported'),
+		secondaryActionStatus = COOKIE.get('secondaryActionClicked'),
+		successStatus = COOKIE.get('successModalShown');
+
+	// If first document has been exported and the sign secondary action has been clicked, show success modal after clicking send button
+	if (firstDocumentExportStatus && (secondaryActionStatus === 'share')) {
+
+		$('#accessLevel-view').on('click', function () {
+			$('#sendButton').on('click.showSuccessModal', function () {
+				setTimeout(function () {
+					$('.onboardingModal.success').modal('show');
+					OnboardingTour.track(modalType, 'Success Modal');
+					COOKIE.set('successModalShown', 1);
+				}, 2000);
+			});
+		});
+
+		$('#accessLevel-sign').on('click', function () {
+			$('#sendButton').off('click.popup');
+
+			$('#ownerRequestActionToolbar button').eq(0).click(function () {
+				setTimeout(function () {
+					// Check for added signature
+					if ($('.request-signature-sign-popup').length) {
+						$('.onboardingModal.success').modal('show');
+						OnboardingTour.track(modalType, 'Success Modal');
+						COOKIE.set('successModalShown', 1);
+					}
+				}, 2000);
+			});
+		});
+	}
+};
+
+OnboardingTour.setClickEventHandlers = function (modalSelector, modalType) {
+	$('.onboarding-modal-secondary-action, .onboarding-modal-main-cta-button').click(function () {
+		var ctaAction = $(this).data('ctatype');
+
+		COOKIE.set('secondaryActionClicked', ctaAction);
+	});
+
+	$('.onboardingTourUploadButton').on('load', function () {
+		$('.onboardingTourUploadButton').contents().find('#uploadPDFLarge').click(function () {
+			var ctaAction = $(this).data('ctatype');
+
+			$('.onboardingTourUploadButton').contents().find('input[type="file"]').change(function () {
+				COOKIE.set('secondaryActionClicked', ctaAction);
+			});
+		});
+	});
+
+
+	// Upload button tracking
+	var trackingString = OnboardingTour.createUploadTrackingString(modalType);
+	$('.onboardingTourUploadButton').contents().find('#uploadPDFLarge').attr('onclick', 'window.parent.window._track("' + trackingString + '", "Upload")');
+
+	// Success modal main cta tracking
+	$('.onboardingModal.success .onboarding-modal-main-cta-button').attr('onclick', '_track("' + OnboardingTour.currentFlow + ' Variation | Success Modal | ' + OnboardingTour.getCurrentBuilder() + '", "My Documents")');
+
+	$('.onboarding-modal-close-button').click(function (e) {
+		e.preventDefault();
+		$(modalSelector).modal('hide');
+	});
+};
+
+OnboardingTour.setDocumentSearchHandlers = function () {
+	$('.onboarding-modal-search-field-button').click(function () {
+		window.location = '/documentLibrary.php?search=' + $('.onboarding-modal-search-field').val();
+	});
+};
+
+OnboardingTour.styleIframeUploadButton = function () {
+	var buttonCss = '<style type="text/css">#uploadPDFLarge {padding-top: 11px;display: block;overflow: auto;font-size: 13px;font-weight: 500;}</style>',
+		iframe = $('.onboardingTourUploadButton').contents();
+
+	iframe.find("head").append(buttonCss);
+	iframe.find('#uploadPDFLarge').removeClass().attr('data-ctatype', 'upload');
+	iframe.find('.icon-white').hide();
+};
+
+OnboardingTour.handleDocumentLibraryLogic = function () {
+	$('body').on('click', '.btn.btn-mini.btn-success', function () {
+		var selectedDocumentType = $(this).parent().parent().attr('data-type');
+
+		COOKIE.set('documentFromLibrarySelected', selectedDocumentType);
+	});
+}
+
+OnboardingTour.track = function (modalType, modalPhase) {
+	var onboardingFlow = OnboardingTour.currentFlow + ' Variation',
+		currentBuilder = OnboardingTour.getCurrentBuilder(),
+		builderString;
+
+	builderString = modalPhase + ' | ' + currentBuilder;
+	window._track(builderString, onboardingFlow);
+};
+
+OnboardingTour.createUploadTrackingString = function (modalType) {
+	var onboardingFlow = OnboardingTour.currentFlow + ' Variation',
+		currentBuilder = OnboardingTour.getCurrentBuilder();
+
+	return onboardingFlow + ' | Secondary CTA | Second Action Modal | ' + currentBuilder;
+}
+
+OnboardingTour.getCurrentBuilder = function () {
+	var currentBuilder;
+
+	if ($('.sticky-time-estimate-toolbar').length) {
+		currentBuilder = 'Visual Static-Builder-Member';
+	} else if (window.CurrentDocumentInfo && window.CurrentDocumentInfo.builder === 'static') {
+		currentBuilder = 'Static-Builder-Member';
+	} else if (window.location.pathname.indexOf('free-write') !== -1) {
+		currentBuilder = 'Freewrite-Builder-Member';
+	}
+
+	return currentBuilder;
+}

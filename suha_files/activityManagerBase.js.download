@@ -1,0 +1,409 @@
+/* The custom version makes the following changes:
+ *      1.  Wraps Paf.ActivityManagerBase class definition in an immediately-invoked function expression. This protects it
+ *          from the global namespace.
+ *
+ *      2.  Removes the dependency on Mootools' "Class" object. Mootools changes the prototypes of Javascript native functions.
+ *          This can't be avoided by namespacing MooTools. https://mootools.lighthouseapp.com/projects/2706/tickets/219-mootools-namespace
+ **/
+
+﻿var Paf = Paf || {};
+
+(function(Paf, undefined){
+
+    Paf.ActivityManagerBase = function (hubService, playerFrame) {
+        this._hubService = hubService;
+        this._clearData();
+        this.setPlayerLoader(new Paf.ActivityPlayerLoader(playerFrame));
+    };
+    
+    Paf.ActivityManagerBase.prototype = {
+
+        VERSION: "1",
+
+        // Holds the URL to bootstrap the loading process
+        _sequenceUrl: null,
+
+        // Currently loaded activity sequence
+        _activitySequence: null,
+
+        // Array of item bindings
+        _items: null,
+
+        // Hashtable of sequenceNodes
+        _sequenceNodes: null,
+
+        // Hashtable of bindings
+        _bindings: null,
+
+        // List of player URI's based on contentType
+        _itemPlayers: null,
+
+        // Object that performs all communication with the Hub.
+        _hubService: null,
+
+        /**
+         * This will handle all loading and communication with the player frame.
+         * In the case of the Native implementation it will represent the ItemPlayer frame.
+         * In the case of the Custom implementation it will represent the Custom Assignment Player frame.
+         * As far as the Activity Manager is concerned, the details about the frame itself should not matter.
+         */
+        _playerLoader: null,
+
+        // Events to subscribe to using the .bind() method
+        EVENT_ITEM_LOADED: "ItemLoaded",
+        EVENT_SEQUENCE_LOADED: "SequenceLoaded",
+        EVENT_SEQUENCE_FINISHED: "SequenceFinished",
+		EVENT_TOGGLE_UI: "ToggleUI",
+		EVENT_TOGGLE_STANDBY: "ToggleStandby",
+
+        /**
+         * Constructor for ActivityManagerBase
+         */
+        /*initialize: function (hubService, playerFrame) {
+            this._hubService = hubService;
+            this._clearData();
+            this.setPlayerLoader(new Paf.ActivityPlayerLoader(playerFrame));
+        },*/
+
+        /**
+         * PUBLIC API
+         */
+
+        /**
+         * Initializes the activity manager, loading the activity sequence from the
+         * specified URL.  If player information is passed, players are also initialized.
+         * @param {String} sequenceURL - the URL of the sequence
+         * @param {optional Object} playerInfo - optional player information
+         */
+        setup: function (sequenceUrl, playerInfo) {
+            this._sequenceUrl = sequenceUrl;
+            // If optional playerInfo is supplied, then store it
+            if (playerInfo)
+                this.registerPlayers(playerInfo);
+            // This call assumes the loading will be synchronous
+            this._getRichSequence();
+        },
+
+        /**
+         * @returns the number of items in the sequence.
+         */
+        itemCount: function () {
+            return this._items === null ? 0 : this._items.length;
+        },
+
+        /**
+         * Returns the the contents of an item in the sequence
+         * @returns the activity binding node
+         */
+        getItem: function (index) {
+            return this._items[index];
+        },
+
+        /**
+         * Register the following events:
+         * EVENT_ITEM_LOADED - triggered when an item (activity) is loaded
+         * EVENT_SEQUENCE_LOADED - triggered when the overall sequence is loaded
+         * EVENT_SEQUENCE_FINISHED - triggered when the sequence is completed and submitted
+         */
+        bind: function (eventName, callback, context) {
+            if (context) {
+                var newCallback = function () {
+                    callback.apply(context, arguments);
+                };
+                $(this).bind(eventName, newCallback);
+            }
+            else
+                $(this).bind(eventName, callback);
+        },
+
+        setPlayerLoader: function (playerLoader) {
+            this._playerLoader = playerLoader;
+            playerLoader.bind(playerLoader.EVENT_NODERESULT, this._processNodeResult, this);
+            playerLoader.bind(playerLoader.EVENT_SEQUENCENODE_LOADED, this._processSequenceNodeLoaded, this);
+            playerLoader.bind(playerLoader.EVENT_CHECKRESULT, this.checkItem, this);
+            playerLoader.bind(playerLoader.EVENT_TOGGLE_UI, this._toggleUI, this);
+            playerLoader.bind(playerLoader.EVENT_TOGGLE_STANDBY, this._toggleStandby, this);
+        },
+
+        getPlayerLoader: function () {
+            return this._playerLoader;
+        },
+
+        /**
+         * This is how the ActivityManager will determine player URI's.
+         * @param players - object hash in the form { "contentType1" : "uri1", "contentType2" : "uri2", ... }
+         */
+        registerPlayers: function (players) {
+            if (this._itemPlayers == null)
+                this._itemPlayers = {};
+            $.extend(this._itemPlayers, players);
+        },
+
+        /**
+         * Returns a deferred to an HTML report
+         */
+        report: function () {
+            this._checkHubService();
+            return this._hubService.getReport(this._activitySequence.guid);
+        },
+
+        /**
+         * Returns a promise for a sequence node for a given item based on index
+         */
+        getSequenceNode: function (index) {
+            var context = this;
+            // The URL we post to is stored in the activity sequence
+            var url = this._activitySequence.nodeCollection;
+            var activity = context.getItem(index);
+            var targetBinding = activity["@id"];
+            // Index in the server is 1 based
+            // TODO - not sure what nodeIdex will be used for.  Ask someone.
+            var nodeIndex = index + 1;
+            this._checkHubService();
+            return this._hubService.getSequenceNode(url, targetBinding, nodeIndex).done(
+                function (sequenceNode) {
+                    context._processSequenceNode(sequenceNode);
+                }
+            );
+        },
+
+        /**
+         * SEQUENCENODE HANDLING METHODS
+         * In the case of the Native player it will attempt to load the player and then push the sequenceNode to the player.
+         * In the case of the Custom player it will just post the sequenceNode and have the custom player deal with it.
+         */
+
+        executeSequenceNode: function (sequenceNode) {
+            // Default implementation does nothing.
+        },
+
+        loadPlayer: function (playerUrl) {
+            return this._playerLoader.loadPlayer(playerUrl);
+        },
+
+        postSequenceNode: function (sequenceNode) {
+            this.postPlayerMessage(sequenceNode);
+        },
+
+        postPlayerMessage: function (message) {
+            this._playerLoader.postMessage(message);
+        },
+
+        /**
+         * Overridden by descendant in order to modify nodeResult prior to posting to hub.
+         * This is where nextBinding information is added if needed.
+         */
+        filterNodeResult: function (nodeResult) {
+
+        },
+
+        checkItem: function() {
+
+        },
+
+        /**
+         * EVENT TRIGGERING METHODS
+         */
+
+        /**
+         * This event will inform any listeners that an activity was successfully loaded.
+         */
+        itemLoaded: function (index) {
+            $(this).trigger(this.EVENT_ITEM_LOADED, index);
+        },
+
+        /**
+         * This event will inform any listeners that a sequence has been loaded.  This will
+         * allow us to change our AJAX calls to be asynchronous some day without affecting the caller.
+         */
+        sequenceLoaded: function (activitySequence) {
+            $(this).trigger(this.EVENT_SEQUENCE_LOADED, activitySequence);
+        },
+
+        /**
+         * This event will signal the hub to mark the sequence completed and
+         * inform any listeners that the sequence has been completed.
+         */
+        sequenceFinished: function () {
+            // Fire events
+            $(this).trigger(this.EVENT_SEQUENCE_FINISHED);
+
+            // Notify the hub that we're done - NOTE this needs to be the last
+            // service call we make to the Hub because it destroys our session -FMT
+            this._hubService.endSequence(this._sequenceUrl);
+        },
+
+
+        /**
+         * PRIVATE METHODS
+         */
+
+        _getRichSequence: function () {
+            var context = this;
+            this._checkHubService();
+            this._hubService.getRichSequence(this._sequenceUrl).done(
+                function (json) {
+                    context._processSequence(json);
+                }
+            );
+        },
+
+        // Process the sequence returned by the server
+        _processSequence: function (activitySequence) {
+            this._clearData();
+            this._activitySequence = activitySequence;
+            modeSettings.mode = activitySequence.activityMode;
+            var activity = activitySequence.overallActivity;
+            if (!activity) {
+                Notification.showMsgWithBlocking("Activity is null", "danger");
+                return;
+            }
+            // Reading in all binding
+            if (!activity.assignmentContents) {
+                Notification.showMsgWithBlocking("AssignmentContents is missing from the sequence", "danger");
+                return;
+            }
+            var bindings = activity.assignmentContents.binding;
+            if (!jQuery.isArray(bindings)) {
+                bindings = [bindings];
+            }
+            var context = this;
+            $.each(bindings, function (i, binding) {
+                context._bindings[binding["@id"]] = binding;
+                context._items.push(binding);
+            });
+            this.sequenceLoaded(activitySequence);
+        },
+
+        _processSequenceNodeLoaded: function (evt, message) {
+            var sequenceNodeId = message.sequenceNodeId;
+            if (sequenceNodeId) {
+                // Retrieve itemIndex stored along with sequenceNode
+                var index = this._getItemIndexFromSequenceNodeId(sequenceNodeId);
+                if (index >= 0)
+                    this.itemLoaded(index);
+            }
+        },
+
+        _getItemIndexFromBindingId: function (bindingId) {
+            var binding = this._bindings[bindingId];
+            if (binding)
+                return binding.bindingIndex;
+            else
+                return -1;
+        },
+
+        _getItemIndexFromSequenceNodeId: function (sequenceNodeId) {
+            var sequenceNode = this._sequenceNodes[sequenceNodeId];
+            if (sequenceNode)
+                return sequenceNode.nodeIndex;
+            else
+                return -1;
+        },
+
+        _processNodeResult: function (evt, nodeResult) {
+            // Validate existence of sequenceNodeId
+            if (!nodeResult.originalMsgId) {
+                Notification.showMsgWithBlocking("NodeResultResponse from item player is missing the originalMsgId", "danger");
+                return;
+            }
+            // Find which itemIndex we're talking about
+            var itemIndex = this._getItemIndexFromSequenceNodeId(nodeResult.originalMsgId);
+            if (itemIndex < 0) {
+                Notification.showMsgWithBlocking("NodeResult bindingId cannot be found", "danger");
+                return;
+            }
+            // Call filterNodeResult to will allow descendant classes to modify it.  activityManager will update nextBinding.
+            this.filterNodeResult(nodeResult);
+            this._postNodeResult(itemIndex, nodeResult.requestedResult);
+        },
+
+        // This method will register the sequenceNode with the item it is associated with.
+        _registerSequenceNode: function (sequenceNode) {
+            // TODO - there's a bug in the hub where the very first sequenceNode returns a nodeIndex = 1 and it should
+            // be 0, so for now, I'm going to look to see if the list is empty.  If so, I'll set the index to 0.
+            // When the bug is fixed we can remove this code.
+            if ($.isEmptyObject(this._sequenceNodes))
+                sequenceNode.nodeIndex = 0;
+            else {
+                // This is still part of the workaround.  If it's not empty, we should check for an existing sequenceNode. If
+                // we find a match we should just set the nodeIndex equal.  I'm doing this because when you go back to
+                // the first one, it's still reporting 1 and it should be zero.
+                var seq = this._sequenceNodes[sequenceNode["@id"]];
+                if (seq)
+                    sequenceNode.nodeIndex = seq.nodeIndex;
+            }
+            this._sequenceNodes[sequenceNode["@id"]] = sequenceNode;
+            // For now assume that nodeIndex stored in sequenceNode maps directly to an item.
+            // Establish a relationship between an "Item" and "SequenceNode"
+            this._items[sequenceNode.nodeIndex].sequenceNode = sequenceNode;
+            // We should determine if we have a contentType override registered.  If so,
+            // just replace it in the sequenceNode so we can forget about it.
+            if (sequenceNode.player && sequenceNode.player.contentType) {
+                var playerUrl = this._getPlayerUrl(sequenceNode.player.contentType);
+                if (playerUrl)
+                    sequenceNode.player.frameFrontend.frameURI = playerUrl;
+            }
+        },
+
+        _postNodeResult: function (index, result) {
+            var context = this;
+            var sequenceNode = this.getItem(index).sequenceNode;
+            this._checkHubService();
+            return this._hubService.postNodeResult(sequenceNode, result).done(
+                function (response) {
+                    context._nodeResultPosted(response);
+                }
+            );
+        },
+
+        _checkHubService: function () {
+            if (this._hubService == null)
+                throw new Error("hubService has not been supplied to the activityManager");
+        },
+
+        _clearData: function () {
+            this._items = [];
+            this._sequenceNodes = {};
+            this._bindings = {};
+        },
+
+        /**
+         * Internal method used to process an incoming sequenceNode
+         */
+        _processSequenceNode: function (sequenceNode) {
+            this._registerSequenceNode(sequenceNode);
+            this.executeSequenceNode(sequenceNode);
+        },
+
+        /**
+         * Called to process nodeResults.  This routine is overridden by the descendant class so I'm not sure if I should have an _ or not??
+         */
+        _nodeResultPosted: function (resultResponse, reason) {
+            if (! resultResponse) {
+                // The hub didn't return the next sequence node, so we're done
+                this.sequenceFinished();
+            }
+            else {
+                // This code should look to display a new question possibly
+                if (resultResponse["@type"] != "SequenceNode") {
+                    Notification.showMsgWithBlocking("Result is not in the form of a SequenceNode", "danger");
+                    return;
+                }
+                this._processSequenceNode(resultResponse);
+            }
+        },
+
+        _getPlayerUrl: function (contentType) {
+            return this._itemPlayers[contentType];
+        },
+
+		_toggleUI: function(evt, toggleUIMessage) {
+            $(this).trigger(this.EVENT_TOGGLE_UI, toggleUIMessage);
+		},
+
+		_toggleStandby: function(evt, toggleStandbyMessage) {
+            $(this).trigger(this.EVENT_TOGGLE_STANDBY, toggleStandbyMessage);
+		}
+    };
+})(Paf);

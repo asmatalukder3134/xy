@@ -1,0 +1,84 @@
+/*
+some tile sorts will utilize a colored header.
+*/
+
+
+.sorter-identifier .drop-header {
+    color: #4c4c4c;
+}
+.sorter-identifier .drag-text .controls {
+    left: 2px;
+    top: 2px;
+}
+.sorter-identifier .drag-text-cell .gadget-textblock {
+	margin: 0;
+}
+
+.sorter-identifier .drop-header .drop-text .gadget-textblock {
+    color: #4c4c4c!important;
+}
+
+.sorter-identifier .drag-item {
+    width: auto;
+}
+
+.sorter-identifier .drop-button,
+.sorter-identifier .drop-header,
+.sorter-identifier .drop-text,
+.sorter-identifier .drop-text .gadget-textblock {
+    height: 56px;
+}
+
+.sorter-identifier .drag-text {
+    height: 68px;
+}
+
+.sorter-identifier .drop-container-th1 .drop-button {
+    background-color: #cfedfb;
+    border: solid 2px #00a0dc;
+}
+
+.sorter-identifier .drop-container-th1 .drop-button-button-over {
+    background-color: #9bdaf3;
+    border: solid 2px #008cc9;
+}
+
+.sorter-identifier .drop-container-th2 .drop-button {
+    background-color: #e5efc7;
+    border: solid 2px #7cb82f;
+}
+
+.sorter-identifier .drop-container-th2 .drop-button-button-over {
+    background-color: #cee4a3;
+    border: solid 2px #69a62a;
+}
+
+.sorter-identifier .drop-container-th3 .drop-button {
+    background-color: #faf0b5;
+    border: solid 2px #edb220;
+}
+
+.sorter-identifier .drop-container-th3 .drop-button-button-over {
+    background-color: #f7df8c;
+    border: solid 2px #d3a02e;
+}
+
+.sorter-identifier .drop-container-th4 .drop-button {
+    background-color: #f0e3ef;
+    border: solid 2px #8d6cab;
+}
+
+.sorter-identifier .drop-container-th4 .drop-button-button-over {
+    background-color: #ddcce2;
+    border: solid 2px #7b539d;
+}
+
+.sorter-identifier .drop-container-th5 .drop-button {
+    background-color: #ffe2d2;
+    border: solid 2px #dd5143;
+}
+
+.sorter-identifier .drop-container-th5 .drop-button-button-over {
+    background-color: #fec9b8;
+    border: solid 2px #c9342f;
+}
